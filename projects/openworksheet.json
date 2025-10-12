@@ -2,7 +2,7 @@
   "id": "proj_openworksheet",
   "name": "openworksheet",
   "createdAt": "2025-10-12T18:19:58.569Z",
-  "updatedAt": "2025-10-12T20:17:55.902Z",
+  "updatedAt": "2025-10-12T21:41:54.905Z",
   "status": "synced",
   "workflow": {
     "createdAt": "2025-10-12T18:19:58.569Z",
@@ -365,15 +365,21 @@
     "tags": []
   },
   "metadata": {
-    "version": "1.0.0",
+    "version": "1.0.1",
     "author": "Mykhailo Bielov",
     "description": "Automated workflow to process Excel worksheets from Google Drive and sync data to n8n Data Table",
-    "tags": ["automation", "google-drive", "excel", "data-sync", "scheduled"],
+    "tags": [
+      "automation",
+      "google-drive",
+      "excel",
+      "data-sync",
+      "scheduled"
+    ],
     "github": {
       "repository": "https://github.com/belmic/n8n_projects",
       "branch": "main",
       "synced": true,
-      "lastSync": "2025-10-12T21:30:00.000Z"
+      "lastSync": "2025-10-12T21:41:54.906Z"
     },
     "workflowDetails": {
       "nodes": 7,

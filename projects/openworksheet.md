@@ -188,6 +188,7 @@ npm run cursor:sync openworksheet https://github.com/belmic/n8n_projects.git
 - `openworksheet.md` - This README
 
 ## Version History
+- **v1.0.1**: Updated from n8n instance (2025-10-12)
 - **v1.0.0**: Initial implementation with 13 worksheet processing
 - **v1.0.1**: Fixed folder mapping and duplicate handling
 - **v1.0.2**: Optimized with Upsert operation for better performance
