@@ -372,8 +372,8 @@
     "github": {
       "repository": "https://github.com/belmic/n8n_projects",
       "branch": "main",
-      "synced": false,
-      "lastSync": null
+      "synced": true,
+      "lastSync": "2025-10-12T21:30:00.000Z"
     },
     "workflowDetails": {
       "nodes": 7,
