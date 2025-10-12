@@ -1,0 +1,19 @@
+{
+  "id": "proj_example",
+  "name": "example",
+  "createdAt": "2025-10-12T21:24:23.000Z",
+  "updatedAt": "2025-10-12T21:24:23.000Z",
+  "status": "draft",
+  "workflow": null,
+  "metadata": {
+    "version": "1.0.0",
+    "author": "admin",
+    "description": "Example n8n workflow project",
+    "tags": ["example", "template"],
+    "github": {
+      "repository": null,
+      "branch": "main",
+      "synced": false
+    }
+  }
+}

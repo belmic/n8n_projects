@@ -1,0 +1,205 @@
+#!/usr/bin/env node
+
+/**
+ * n8n Project Manager for Cursor
+ * 
+ * Features:
+ * - Auto-create project.json files in /n8n folder
+ * - Sync with n8n instance
+ * - GitHub integration
+ * - Local file management
+ */
+
+const fs = require('fs');
+const path = require('path');
+const { execSync } = require('child_process');
+
+class N8nProjectManager {
+  constructor() {
+    this.n8nFolder = '/Users/admin/Projects/n8n';
+    this.projectsFolder = path.join(this.n8nFolder, 'projects');
+    this.ensureDirectories();
+  }
+
+  ensureDirectories() {
+    if (!fs.existsSync(this.projectsFolder)) {
+      fs.mkdirSync(this.projectsFolder, { recursive: true });
+    }
+  }
+
+  /**
+   * Create a new project with JSON file
+   */
+  createProject(projectName, workflowData = null) {
+    const projectId = this.generateProjectId();
+    const projectFile = path.join(this.projectsFolder, `${projectName}.json`);
+    
+    const projectData = {
+      id: projectId,
+      name: projectName,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      status: 'draft',
+      workflow: workflowData || null,
+      metadata: {
+        version: '1.0.0',
+        author: process.env.USER || 'unknown',
+        description: `n8n workflow: ${projectName}`,
+        tags: [],
+        github: {
+          repository: null,
+          branch: 'main',
+          synced: false
+        }
+      }
+    };
+
+    fs.writeFileSync(projectFile, JSON.stringify(projectData, null, 2));
+    console.log(`✅ Created project: ${projectName}.json`);
+    
+    return projectData;
+  }
+
+  /**
+   * Update project with workflow data from n8n instance
+   */
+  updateProject(projectName, workflowData) {
+    const projectFile = path.join(this.projectsFolder, `${projectName}.json`);
+    
+    if (!fs.existsSync(projectFile)) {
+      throw new Error(`Project ${projectName} not found`);
+    }
+
+    const projectData = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+    projectData.workflow = workflowData;
+    projectData.updatedAt = new Date().toISOString();
+    projectData.status = 'synced';
+
+    fs.writeFileSync(projectFile, JSON.stringify(projectData, null, 2));
+    console.log(`✅ Updated project: ${projectName}.json`);
+    
+    return projectData;
+  }
+
+  /**
+   * Sync project with GitHub
+   */
+  async syncToGitHub(projectName, repoUrl) {
+    const projectFile = path.join(this.projectsFolder, `${projectName}.json`);
+    const projectData = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+    
+    try {
+      // Initialize git if not already done
+      if (!fs.existsSync(path.join(this.n8nFolder, '.git'))) {
+        execSync('git init', { cwd: this.n8nFolder });
+        execSync('git remote add origin ' + repoUrl, { cwd: this.n8nFolder });
+      }
+
+      // Add and commit changes
+      execSync('git add .', { cwd: this.n8nFolder });
+      execSync(`git commit -m "Update ${projectName} workflow"`, { cwd: this.n8nFolder });
+      execSync('git push origin main', { cwd: this.n8nFolder });
+
+      // Update project metadata
+      projectData.metadata.github.repository = repoUrl;
+      projectData.metadata.github.synced = true;
+      projectData.metadata.github.lastSync = new Date().toISOString();
+      
+      fs.writeFileSync(projectFile, JSON.stringify(projectData, null, 2));
+      
+      console.log(`✅ Synced ${projectName} to GitHub`);
+      return true;
+    } catch (error) {
+      console.error(`❌ GitHub sync failed: ${error.message}`);
+      return false;
+    }
+  }
+
+  /**
+   * List all projects
+   */
+  listProjects() {
+    const files = fs.readdirSync(this.projectsFolder)
+      .filter(file => file.endsWith('.json'))
+      .map(file => {
+        const projectData = JSON.parse(fs.readFileSync(path.join(this.projectsFolder, file), 'utf8'));
+        return {
+          name: projectData.name,
+          id: projectData.id,
+          status: projectData.status,
+          updatedAt: projectData.updatedAt,
+          hasWorkflow: !!projectData.workflow,
+          githubSynced: projectData.metadata.github.synced
+        };
+      });
+
+    return files;
+  }
+
+  /**
+   * Generate unique project ID
+   */
+  generateProjectId() {
+    return 'proj_' + Math.random().toString(36).substr(2, 9);
+  }
+
+  /**
+   * Export workflow to different formats
+   */
+  exportWorkflow(projectName, format = 'json') {
+    const projectFile = path.join(this.projectsFolder, `${projectName}.json`);
+    const projectData = JSON.parse(fs.readFileSync(projectFile, 'utf8'));
+    
+    if (!projectData.workflow) {
+      throw new Error(`No workflow data found for ${projectName}`);
+    }
+
+    const exportFile = path.join(this.projectsFolder, `${projectName}.${format}`);
+    
+    switch (format) {
+      case 'json':
+        fs.writeFileSync(exportFile, JSON.stringify(projectData.workflow, null, 2));
+        break;
+      case 'yaml':
+        const yaml = require('js-yaml');
+        fs.writeFileSync(exportFile, yaml.dump(projectData.workflow));
+        break;
+      default:
+        throw new Error(`Unsupported format: ${format}`);
+    }
+
+    console.log(`✅ Exported ${projectName} to ${format}`);
+    return exportFile;
+  }
+}
+
+module.exports = N8nProjectManager;
+
+// CLI usage
+if (require.main === module) {
+  const manager = new N8nProjectManager();
+  const command = process.argv[2];
+  const projectName = process.argv[3];
+
+  switch (command) {
+    case 'create':
+      manager.createProject(projectName);
+      break;
+    case 'list':
+      console.table(manager.listProjects());
+      break;
+    case 'export':
+      const format = process.argv[4] || 'json';
+      manager.exportWorkflow(projectName, format);
+      break;
+    default:
+      console.log(`
+Usage: node project-manager.js <command> [projectName] [options]
+
+Commands:
+  create <name>     - Create new project
+  list             - List all projects
+  export <name> [format] - Export workflow (json|yaml)
+      `);
+  }
+}

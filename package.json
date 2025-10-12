@@ -1,0 +1,37 @@
+{
+  "name": "n8n-project-manager",
+  "version": "1.0.0",
+  "description": "Project management system for n8n workflows with Cursor integration",
+  "main": "project-manager.js",
+  "scripts": {
+    "create": "node project-manager.js create",
+    "list": "node project-manager.js list",
+    "export": "node project-manager.js export",
+    "cursor:create": "node cursor-integration.js create",
+    "cursor:list": "node cursor-integration.js list",
+    "cursor:sync": "node cursor-integration.js sync",
+    "cursor:setup-github": "node cursor-integration.js setup-github",
+    "install-deps": "npm install",
+    "setup": "npm run install-deps && node cursor-integration.js setup-github"
+  },
+  "dependencies": {
+    "js-yaml": "^4.1.0"
+  },
+  "devDependencies": {
+    "prettier": "^3.0.0"
+  },
+  "keywords": [
+    "n8n",
+    "workflow",
+    "automation",
+    "cursor",
+    "project-management",
+    "github"
+  ],
+  "author": "Your Name",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/n8n-projects.git"
+  }
+}
