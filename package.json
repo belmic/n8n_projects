@@ -11,6 +11,8 @@
     "cursor:list": "node cursor-integration.js list",
     "cursor:sync": "node cursor-integration.js sync",
     "cursor:setup-github": "node cursor-integration.js setup-github",
+    "sync:workflow": "node sync-workflow.js sync",
+    "sync:list": "node sync-workflow.js list",
     "install-deps": "npm install",
     "setup": "npm run install-deps && node cursor-integration.js setup-github"
   },
