@@ -1,0 +1,402 @@
+{
+  "id": "proj_openworksheet",
+  "name": "openworksheet",
+  "createdAt": "2025-10-12T18:19:58.569Z",
+  "updatedAt": "2025-10-12T20:17:55.902Z",
+  "status": "synced",
+  "workflow": {
+    "createdAt": "2025-10-12T18:19:58.569Z",
+    "updatedAt": "2025-10-12T20:17:55.902Z",
+    "id": "b9SkVKeYrKBFQhWH",
+    "name": "openworksheet",
+    "active": false,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "rule": {
+            "interval": [
+              {}
+            ]
+          }
+        },
+        "type": "n8n-nodes-base.scheduleTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          0,
+          0
+        ],
+        "id": "e579eb4c-b609-405b-ad86-114f55327a72",
+        "name": "Schedule Trigger"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Generate a list of all worksheets to process\nconst worksheets = [\n  'Social Media Automation',\n  'AI & Content Generation', \n  'Data Sync & ETL',\n  'Other',\n  'E-commerce & Payments',\n  'Chatbots & Messaging',\n  'Email & CRM',\n  'Monitoring, Logging & DevOps',\n  'Forms, Surveys & Feedback',\n  'File & Document Management',\n  'Webhooks & API Orchestration',\n  'Notifications & Alerts',\n  'Calendar & Scheduling'\n];\n\n// Return each worksheet as a separate item\nreturn worksheets.map(worksheetName => ({\n  json: {\n    worksheetName: worksheetName,\n    fileId: '19uFAoelq1ug9ogm8eEN6YcgIGouein6r'\n  }\n}));"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          208,
+          0
+        ],
+        "id": "81cbd993-8c1e-4b87-843e-c861aecdab8c",
+        "name": "ws_list"
+      },
+      {
+        "parameters": {
+          "operation": "download",
+          "fileId": {
+            "__rl": true,
+            "value": "={{ $json.fileId }}",
+            "mode": "id"
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.googleDrive",
+        "typeVersion": 3,
+        "position": [
+          656,
+          16
+        ],
+        "id": "2fe3d99e-74a4-47e9-9548-5e3ee4e859c0",
+        "name": "download",
+        "credentials": {
+          "googleDriveOAuth2Api": {
+            "id": "8rSm3dJNel8Qc1SP",
+            "name": "Google Drive"
+          }
+        }
+      },
+      {
+        "parameters": {
+          "operation": "xlsx",
+          "options": {
+            "headerRow": true,
+            "sheetName": "={{ $json.worksheetName }}"
+          }
+        },
+        "type": "n8n-nodes-base.extractFromFile",
+        "typeVersion": 1,
+        "position": [
+          864,
+          16
+        ],
+        "id": "90029e39-4126-4d86-b3a9-7bc14ffe9b23",
+        "name": "extract"
+      },
+      {
+        "parameters": {
+          "options": {}
+        },
+        "type": "n8n-nodes-base.splitInBatches",
+        "typeVersion": 3,
+        "position": [
+          416,
+          0
+        ],
+        "id": "5940e97b-76ca-4b71-84d9-bd046688af0f",
+        "name": "loop_over_ws"
+      },
+      {
+        "parameters": {
+          "jsCode": "// Add the worksheet name as the folder for each item\nconst worksheetName = $('loop_over_ws').item.json.worksheetName;\n\nreturn $input.all().map(item => ({\n  json: {\n    name: item.json.name,\n    description: item.json.description || '',\n    url: item.json.url || '',\n    score: item.json.score || 0,\n    folder: worksheetName,\n    status: 'new',\n    createdAt: new Date().toISOString(),\n    updatedAt: new Date().toISOString()\n  }\n}));"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          1072,
+          16
+        ],
+        "id": "1c927c50-1db0-4c10-ad0c-f391d906ad2b",
+        "name": "add_folder_name"
+      },
+      {
+        "parameters": {
+          "operation": "upsert",
+          "dataTableId": {
+            "__rl": true,
+            "value": "ZXwX1CFvV01ndly5",
+            "mode": "list",
+            "cachedResultName": "openworksheet_n8n",
+            "cachedResultUrl": "/projects/q3w2LTZBOQaMnapN/datatables/ZXwX1CFvV01ndly5"
+          },
+          "filters": {
+            "conditions": [
+              {
+                "keyName": "name",
+                "keyValue": "={{ $json.name }}"
+              }
+            ]
+          },
+          "columns": {
+            "mappingMode": "defineBelow",
+            "value": {
+              "status": "={{ $json.status }}",
+              "folder": "={{ $json.folder }}",
+              "name": "={{ $json.name }}",
+              "description": "={{ $json.description }}",
+              "url": "={{ $json.url }}",
+              "score": "={{ $json.score }}"
+            },
+            "matchingColumns": [],
+            "schema": [
+              {
+                "id": "status",
+                "displayName": "status",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "folder",
+                "displayName": "folder",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "name",
+                "displayName": "name",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "description",
+                "displayName": "description",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "url",
+                "displayName": "url",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "string",
+                "readOnly": false,
+                "removed": false
+              },
+              {
+                "id": "score",
+                "displayName": "score",
+                "required": false,
+                "defaultMatch": false,
+                "display": true,
+                "type": "number",
+                "readOnly": false,
+                "removed": false
+              }
+            ],
+            "attemptToConvertTypes": false,
+            "convertFieldsToString": false
+          }
+        },
+        "type": "n8n-nodes-base.dataTable",
+        "typeVersion": 1,
+        "position": [
+          1280,
+          16
+        ],
+        "id": "f0cdfaf2-16df-4611-94a0-51ad865e2b03",
+        "name": "upsert_row"
+      }
+    ],
+    "connections": {
+      "Schedule Trigger": {
+        "main": [
+          [
+            {
+              "node": "ws_list",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "ws_list": {
+        "main": [
+          [
+            {
+              "node": "loop_over_ws",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "download": {
+        "main": [
+          [
+            {
+              "node": "extract",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "extract": {
+        "main": [
+          [
+            {
+              "node": "add_folder_name",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "loop_over_ws": {
+        "main": [
+          [],
+          [
+            {
+              "node": "download",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "add_folder_name": {
+        "main": [
+          [
+            {
+              "node": "upsert_row",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "upsert_row": {
+        "main": [
+          [
+            {
+              "node": "loop_over_ws",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
+    "pinData": {},
+    "versionId": "a6ea6605-fb49-468f-b04f-9d8123432ca9",
+    "triggerCount": 0,
+    "shared": [
+      {
+        "createdAt": "2025-10-12T18:19:58.569Z",
+        "updatedAt": "2025-10-12T18:19:58.569Z",
+        "role": "workflow:owner",
+        "workflowId": "b9SkVKeYrKBFQhWH",
+        "projectId": "q3w2LTZBOQaMnapN",
+        "project": {
+          "createdAt": "2025-06-19T19:10:02.873Z",
+          "updatedAt": "2025-06-19T19:27:56.091Z",
+          "id": "q3w2LTZBOQaMnapN",
+          "name": "Mykhailo Bielov <mic.belov@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "projectRelations": [
+            {
+              "createdAt": "2025-06-19T19:10:02.873Z",
+              "updatedAt": "2025-06-19T19:10:02.873Z",
+              "userId": "d77898c9-3f06-4caf-bb7c-709eb64519d3",
+              "projectId": "q3w2LTZBOQaMnapN",
+              "user": {
+                "createdAt": "2025-06-19T19:09:59.870Z",
+                "updatedAt": "2025-10-12T08:47:44.561Z",
+                "id": "d77898c9-3f06-4caf-bb7c-709eb64519d3",
+                "email": "mic.belov@gmail.com",
+                "firstName": "Mykhailo",
+                "lastName": "Bielov",
+                "personalizationAnswers": {
+                  "version": "v4",
+                  "personalization_survey_submitted_at": "2025-06-19T19:28:25.666Z",
+                  "personalization_survey_n8n_version": "1.98.2",
+                  "companySize": "<20",
+                  "companyType": "education",
+                  "role": "business-owner",
+                  "reportedSource": "google"
+                },
+                "settings": {
+                  "userActivated": true,
+                  "firstSuccessfulWorkflowId": "8HqEBFxiW4D0JcNZ",
+                  "userActivatedAt": 1755203494225,
+                  "npsSurvey": {
+                    "responded": true,
+                    "lastShownAt": 1751139170083
+                  },
+                  "easyAIWorkflowOnboarded": true
+                },
+                "disabled": false,
+                "mfaEnabled": false,
+                "lastActiveAt": "2025-10-12",
+                "isPending": false
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "tags": []
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "author": "Mykhailo Bielov",
+    "description": "Automated workflow to process Excel worksheets from Google Drive and sync data to n8n Data Table",
+    "tags": ["automation", "google-drive", "excel", "data-sync", "scheduled"],
+    "github": {
+      "repository": "https://github.com/belmic/n8n_projects",
+      "branch": "main",
+      "synced": false,
+      "lastSync": null
+    },
+    "workflowDetails": {
+      "nodes": 7,
+      "connections": 7,
+      "triggerType": "Schedule Trigger",
+      "executionFrequency": "Daily at 14:00",
+      "dataSource": "Google Drive Excel File",
+      "dataDestination": "n8n Data Table (openworksheet_n8n)",
+      "worksheets": [
+        "Social Media Automation",
+        "AI & Content Generation",
+        "Data Sync & ETL",
+        "Other",
+        "E-commerce & Payments",
+        "Chatbots & Messaging",
+        "Email & CRM",
+        "Monitoring, Logging & DevOps",
+        "Forms, Surveys & Feedback",
+        "File & Document Management",
+        "Webhooks & API Orchestration",
+        "Notifications & Alerts",
+        "Calendar & Scheduling"
+      ]
+    }
+  }
+}
