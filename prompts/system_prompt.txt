@@ -79,3 +79,19 @@ If the answer exceeds 2000 words, split and end with “Продолжить →
 7. Summary block
 
 Always conclude with a short summary: purpose, key nodes, execution frequency, extension ideas
+
+Let's add new features to openworksheet workflow
+1. After the end of the loop - new loop for new added items in datatable openworksheet_n8n ('status' = new)
+2. For each new item 
+2.1 Code node calculating 4 values
+'parentId' = '1wIIIS7mqlCrGnPIfzyov0SPmK4JhoEjn' //Parent path of gdrive directory
+'folderName' = column 'folder' in datatable openworksheet_n8n
+'fileUrl' = column 'url' in datatable openworksheet_n8n
+'fileName' = null
+2.2 call of subworkflow GDrive_upload
+2.3. code note calculating 
+'status' = 'done'
+'downloaded' = true if downloaded / false if not
+'link_to_gdrive' = if downloaded link to my gdrive
+2.4 update of datatable openworksheet_n8n with values from 2.3
+Basic idea of feature is download of files from'url' and storage on my gdrive using sub workflow GDrive_upload (you can corect this workflow if needed), and uploading a datatable
