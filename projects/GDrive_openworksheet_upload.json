@@ -2,9 +2,9 @@
   "id": "proj_gdrive_openworksheet_upload",
   "name": "GDrive_openworksheet_upload",
   "description": "Enhanced Google Drive upload workflow optimized for openworksheet integration with automatic folder management and comprehensive error handling",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "createdAt": "2025-10-13T20:00:00.000Z",
-  "updatedAt": "2025-10-13T20:00:00.000Z",
+  "updatedAt": "2025-10-13T20:35:41.666Z",
   "status": "draft",
   "author": "Mykhailo Bielov",
   "workflowId": "NT4q1dgTH0FdskIJ",
@@ -32,7 +32,10 @@
       "Smart filename extraction",
       "Public sharing permissions",
       "Comprehensive response format"
-    ]
+    ],
+    "github": {
+      "lastSync": "2025-10-13T20:35:41.667Z"
+    }
   },
   "workflow": null,
   "documentation": {
@@ -46,7 +49,7 @@
       },
       {
         "name": "folderName",
-        "type": "string", 
+        "type": "string",
         "required": true,
         "description": "Name of the folder to create/find in parent directory"
       },
@@ -72,7 +75,7 @@
         "folderId": "Google Drive folder ID"
       },
       "failure": {
-        "status": "done", 
+        "status": "done",
         "downloaded": false,
         "link_to_drive": null,
         "error": "Error message",

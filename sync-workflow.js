@@ -48,7 +48,12 @@ function updateProjectFromN8n(projectName) {
     
     // Update metadata
     projectData.updatedAt = new Date().toISOString();
-    projectData.metadata.version = incrementVersion(projectData.metadata.version);
+    projectData.version = incrementVersion(projectData.version);
+    
+    // Ensure metadata.github exists
+    if (!projectData.metadata.github) {
+        projectData.metadata.github = {};
+    }
     projectData.metadata.github.lastSync = new Date().toISOString();
     
     // Write updated project file
