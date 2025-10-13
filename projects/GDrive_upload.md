@@ -323,6 +323,7 @@ build_drive_url (Generate access URLs)
 - `GDrive_upload.md` - This README
 
 ## Version History
+- **v1.0.1**: Updated from n8n instance (2025-10-13)
 - **v1.0.0**: Initial implementation with advanced file upload features
 - **v1.0.1**: Enhanced error handling and binary data management
 - **v1.0.2**: Added duplicate detection and public sharing
