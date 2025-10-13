@@ -1,1 +1,491 @@
-null
+{
+  "createdAt": "2025-10-13T20:14:42.521Z",
+  "updatedAt": "2025-10-13T21:50:00.289Z",
+  "id": "NT4q1dgTH0FdskIJ",
+  "name": "GDrive_openworksheet_upload",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "inputSource": "passthrough"
+      },
+      "id": "start-trigger",
+      "name": "Start",
+      "position": [
+        -400,
+        0
+      ],
+      "type": "n8n-nodes-base.executeWorkflowTrigger",
+      "typeVersion": 1.1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Validate and prepare input parameters\nconst { parentId, folderName, fileUrl, fileName } = $json;\n\n// Validate required parameters\nif (!parentId) throw new Error('parentId is required');\nif (!folderName) throw new Error('folderName is required');\nif (!fileUrl) throw new Error('fileUrl is required');\n\n// Enhanced filename extraction from URL\nfunction extractFileName(url) {\n  try {\n    const urlObj = new URL(url);\n    const pathname = urlObj.pathname;\n    const lastSegment = pathname.split('/').filter(Boolean).pop() || '';\n    \n    // Decode URL encoding\n    const decoded = decodeURIComponent(lastSegment);\n    \n    // If no extension, try to get from query params or default\n    if (!decoded.includes('.')) {\n      return decoded || 'downloaded_file';\n    }\n    \n    return decoded;\n  } catch(e) {\n    return 'downloaded_file';\n  }\n}\n\n// Use provided fileName or extract from URL\nconst finalFileName = fileName || extractFileName(fileUrl);\n\nreturn [{ \n  json: { \n    parentId, \n    folderName, \n    fileUrl, \n    //fileName: finalFileName,\n    originalFileName: fileName // Keep original for reference\n  } \n}];"
+      },
+      "id": "validate-input",
+      "name": "Validate Input",
+      "position": [
+        -208,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "resource": "fileFolder",
+        "searchMethod": "query",
+        "queryString": "={{ `name='${$json.folderName.replace(/'/g, \"\\\\'\")}' and mimeType='application/vnd.google-apps.folder' and trashed=false and '${$json.parentId}' in parents` }}",
+        "limit": 1,
+        "filter": {},
+        "options": {}
+      },
+      "id": "find-folder",
+      "name": "Find Folder",
+      "position": [
+        0,
+        0
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "8rSm3dJNel8Qc1SP",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "leftValue": "={{ $items(\"Find Folder\").some(i => i.json?.id) }}",
+              "rightValue": 0,
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              },
+              "id": "folder-check-condition"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "folder-exists-check",
+      "name": "Folder Exists?",
+      "position": [
+        208,
+        0
+      ],
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2
+    },
+    {
+      "parameters": {
+        "jsCode": "const id = $input.first().json.id;\nif (!id) throw new Error('Folder not found in search');\nreturn [{ json: { folderId: id } }];"
+      },
+      "id": "use-existing-folder",
+      "name": "Use Existing Folder",
+      "position": [
+        400,
+        -96
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "resource": "folder",
+        "name": "={{ $items(\"Validate Input\")[0].json.folderName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "value": "={{ $items(\"Validate Input\")[0].json.parentId }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "id": "create-folder",
+      "name": "Create Folder",
+      "position": [
+        400,
+        112
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "8rSm3dJNel8Qc1SP",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Get folder ID from either existing or newly created folder\nif ($json.folderId) return [{ json: { folderId: $json.folderId } }];\nif ($json.id) return [{ json: { folderId: $json.id } }];\nthrow new Error('No folderId available');"
+      },
+      "id": "get-folder-id",
+      "name": "Get Folder ID",
+      "position": [
+        608,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "url",
+          "value": "={{ $('Validate Input').item.json.fileUrl }}",
+          "__regex": "https:\\/\\/(?:drive|docs)\\.google\\.com(?:\\/.*|)\\/d\\/([0-9a-zA-Z\\-_]+)(?:\\/.*|)"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        832,
+        0
+      ],
+      "id": "38be17d3-ec18-4045-a849-5b296fcd62df",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "8rSm3dJNel8Qc1SP",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Google Drive download returns binary data directly\nconst downloadResult = $input.first();\nconst binary = downloadResult.binary;\n\n// Debug: Let's see what we actually have\nconsole.log('=== DEBUG INFO ===');\nconsole.log('Binary object:', JSON.stringify(binary, null, 2));\nconsole.log('Binary keys:', Object.keys(binary || {}));\n\nconst possibleNames = [\n  binary?.fileName,\n  binary?.name,\n  binary?.filename,\n  binary?.originalName,\n  binary?.data?.fileName,\n  binary?.data?.name\n];\n\nconst binary_file_name = possibleNames.find(name => name && typeof name === 'string') || 'unknown_file';\n\nconsole.log('Binary file name found:', binary_file_name);\n\n// Extract filename from the original Google Drive URL\nfunction extractFileNameFromUrl(url) {\n  try {\n    // Extract file ID from Google Drive URL\n    const match = url.match(/\\/d\\/([a-zA-Z0-9-_]+)/);\n    if (match) {\n      const fileId = match[1];\n      return `file_${fileId}.json`;\n    }\n    return 'downloaded_file.json';\n  } catch(e) {\n    return 'downloaded_file.json';\n  }\n}\n\n// Check if download was successful from Google Drive\nconst hasBinary = !!(downloadResult.binary?.data || downloadResult.binary?.filePath);\nconst hasError = !!downloadResult.error;\n\nconsole.log('hasBinary:', hasBinary);\nconsole.log('hasError:', hasError);\n\nif (hasError || !hasBinary) {\n  // Download failed - return error response\n  return [{\n    json: {\n      status: 'done',\n      downloaded: false,\n      link_to_drive: null,\n      error: downloadResult.error || 'No binary data received from Google Drive',\n      fileUrl: $items('Validate Input')[0]?.json?.fileUrl,\n      fileName: 'ERROR_NO_BINARY',\n      folderId: $items('Get Folder ID')[0]?.json?.folderId,\n      debug: {\n        binaryFileName: binary_file_name,\n        binaryKeys: Object.keys(binary || {})\n      }\n    }\n  }];\n} else {\n  // Download successful - pass through with success flag\n  const originalUrl = $items('Validate Input')[0]?.json?.fileUrl;\n  const extractedFileName = extractFileNameFromUrl(originalUrl);\n  \n  return [{\n    json: {\n      downloadSuccess: true,\n      fileUrl: originalUrl,\n      fileName: binary_file_name,\n      folderId: $items('Get Folder ID')[0]?.json?.folderId,\n      debug: {\n        binaryFileName: binary_file_name,\n        extractedFileName: extractedFileName,\n        binaryKeys: Object.keys(binary || {})\n      }\n    },\n    binary: downloadResult.binary\n  }];\n}"
+      },
+      "id": "check-download-success",
+      "name": "Check Download Success",
+      "position": [
+        1056,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare file for upload with proper naming\nconst input = $input.first();\nconst folderId = input.json.folderId;\nconst fileName = input.json.fileName;\n\nif (!folderId) throw new Error('No folderId available');\n\n// Get binary data from Google Drive download result\n// Google Drive download returns binary data directly, not nested\nconst binary = input.binary;\nif (!binary || (!binary.data && !binary.filePath)) {\n  throw new Error('No binary data available from Google Drive download');\n}\n\n// Ensure file has proper extension\nlet finalFileName = fileName;\nif (!/\\.[a-z0-9]+$/i.test(finalFileName)) {\n  const ext = binary.fileExtension || (binary.mimeType?.split('/')[1]) || 'bin';\n  finalFileName = `${fileName}.${ext}`;\n}\n\n// Copy binary data to prevent loss\nconst copy = JSON.parse(JSON.stringify(binary));\n\nreturn [{\n  json: { \n    folderId, \n    fileName: finalFileName \n  },\n  binary\n}];"
+      },
+      "id": "prepare-upload",
+      "name": "Prepare Upload",
+      "position": [
+        1248,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "name": "={{ $json.fileName }}",
+        "driveId": {
+          "__rl": true,
+          "mode": "list",
+          "value": "My Drive"
+        },
+        "folderId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.folderId }}"
+        },
+        "options": {}
+      },
+      "id": "upload-file",
+      "name": "Upload File",
+      "position": [
+        1456,
+        0
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "8rSm3dJNel8Qc1SP",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "share",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json.id }}",
+          "mode": "id"
+        },
+        "permissionsUi": {
+          "permissionsValues": {
+            "role": "reader",
+            "type": "anyone"
+          }
+        },
+        "options": {}
+      },
+      "id": "set-permissions",
+      "name": "Set Permissions",
+      "position": [
+        1664,
+        0
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "8rSm3dJNel8Qc1SP",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Build final response with all required fields\nconst input = $input.first();\nconst fileId = input.json.id;\n\n// Debug: Log what we're getting\nconsole.log('Build Response - Input:', JSON.stringify(input, null, 2));\nconsole.log('Build Response - FileId:', fileId);\n\nif (!$('Upload File').first().json.id) {\n  return [{ \n    json: { \n      status: 'done',\n      downloaded: false,\n      link_to_drive: null,\n      error: 'No valid file ID from upload or permissions',\n      fileUrl: $items('Validate Input')[0]?.json?.fileUrl,\n      fileName: $items('Validate Input')[0]?.json?.fileName,\n      debug: {\n        receivedFileId: fileId,\n        inputJson: input.json\n      }\n    } \n  }];\n}\n\n// Build Google Drive URLs\nconst driveViewUrl = `https://drive.google.com/file/d/${$('Upload File').first().json.id}/view`;\nconst driveDirectUrl = `https://drive.google.com/uc?export=download&id=${$('Upload File').first().json.id}`;\n\nreturn [{ \n  json: { \n    status: 'done',\n    downloaded: true,\n    link_to_drive: driveViewUrl,\n    fileId: fileId,\n    folderId: $items('Get Folder ID')[0]?.json?.folderId,\n    driveDirectUrl: driveDirectUrl,\n    fileUrl: $items('Validate Input')[0]?.json?.fileUrl,\n    fileName: $items('Validate Input')[0]?.json?.fileName\n  } \n}];"
+      },
+      "id": "build-response",
+      "name": "Build Response",
+      "position": [
+        1888,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Input": {
+      "main": [
+        [
+          {
+            "node": "Find Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Find Folder": {
+      "main": [
+        [
+          {
+            "node": "Folder Exists?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Folder Exists?": {
+      "main": [
+        [
+          {
+            "node": "Use Existing Folder",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Create Folder",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Use Existing Folder": {
+      "main": [
+        [
+          {
+            "node": "Get Folder ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create Folder": {
+      "main": [
+        [
+          {
+            "node": "Get Folder ID",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get Folder ID": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Check Download Success": {
+      "main": [
+        [
+          {
+            "node": "Prepare Upload",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare Upload": {
+      "main": [
+        [
+          {
+            "node": "Upload File",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Upload File": {
+      "main": [
+        [
+          {
+            "node": "Set Permissions",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Set Permissions": {
+      "main": [
+        [
+          {
+            "node": "Build Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Check Download Success",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all",
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "7c34e0ab-e243-46bc-b768-4fe98a4f525b",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-10-13T20:14:42.521Z",
+      "updatedAt": "2025-10-13T20:14:42.521Z",
+      "role": "workflow:owner",
+      "workflowId": "NT4q1dgTH0FdskIJ",
+      "projectId": "q3w2LTZBOQaMnapN",
+      "project": {
+        "createdAt": "2025-06-19T19:10:02.873Z",
+        "updatedAt": "2025-06-19T19:27:56.091Z",
+        "id": "q3w2LTZBOQaMnapN",
+        "name": "Mykhailo Bielov <mic.belov@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-06-19T19:10:02.873Z",
+            "updatedAt": "2025-06-19T19:10:02.873Z",
+            "userId": "d77898c9-3f06-4caf-bb7c-709eb64519d3",
+            "projectId": "q3w2LTZBOQaMnapN",
+            "user": {
+              "createdAt": "2025-06-19T19:09:59.870Z",
+              "updatedAt": "2025-10-13T17:30:51.989Z",
+              "id": "d77898c9-3f06-4caf-bb7c-709eb64519d3",
+              "email": "mic.belov@gmail.com",
+              "firstName": "Mykhailo",
+              "lastName": "Bielov",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-06-19T19:28:25.666Z",
+                "personalization_survey_n8n_version": "1.98.2",
+                "companySize": "<20",
+                "companyType": "education",
+                "role": "business-owner",
+                "reportedSource": "google"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "8HqEBFxiW4D0JcNZ",
+                "userActivatedAt": 1755203494225,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1751139170083
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-10-13",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}
