@@ -1,0 +1,83 @@
+{
+  "id": "proj_gdrive_openworksheet_upload",
+  "name": "GDrive_openworksheet_upload",
+  "description": "Enhanced Google Drive upload workflow optimized for openworksheet integration with automatic folder management and comprehensive error handling",
+  "version": "1.0.0",
+  "createdAt": "2025-10-13T20:00:00.000Z",
+  "updatedAt": "2025-10-13T20:00:00.000Z",
+  "status": "draft",
+  "author": "Mykhailo Bielov",
+  "workflowId": "NT4q1dgTH0FdskIJ",
+  "hasWorkflow": true,
+  "githubSynced": false,
+  "tags": [
+    "google-drive",
+    "file-upload",
+    "openworksheet",
+    "automation",
+    "subworkflow",
+    "integration"
+  ],
+  "metadata": {
+    "complexity": "intermediate",
+    "nodeCount": 12,
+    "triggerType": "Execute Workflow Trigger",
+    "executionFrequency": "On-demand",
+    "dataSource": "External API/URL",
+    "dataDestination": "Google Drive",
+    "integration": "openworksheet_enhanced",
+    "features": [
+      "Automatic folder management",
+      "File download with error handling",
+      "Smart filename extraction",
+      "Public sharing permissions",
+      "Comprehensive response format"
+    ]
+  },
+  "workflow": null,
+  "documentation": {
+    "overview": "Enhanced Google Drive upload workflow specifically designed for openworksheet integration. Handles automatic folder creation, file downloads, uploads, and provides comprehensive status responses.",
+    "inputParameters": [
+      {
+        "name": "parentId",
+        "type": "string",
+        "required": true,
+        "description": "Google Drive parent folder ID where files will be uploaded"
+      },
+      {
+        "name": "folderName",
+        "type": "string", 
+        "required": true,
+        "description": "Name of the folder to create/find in parent directory"
+      },
+      {
+        "name": "fileUrl",
+        "type": "string",
+        "required": true,
+        "description": "URL of the file to download and upload to Google Drive"
+      },
+      {
+        "name": "fileName",
+        "type": "string",
+        "required": false,
+        "description": "Optional custom filename (will be extracted from URL if not provided)"
+      }
+    ],
+    "outputFormat": {
+      "success": {
+        "status": "done",
+        "downloaded": true,
+        "link_to_drive": "https://drive.google.com/uc?export=view&id=FILE_ID",
+        "fileId": "Google Drive file ID",
+        "folderId": "Google Drive folder ID"
+      },
+      "failure": {
+        "status": "done", 
+        "downloaded": false,
+        "link_to_drive": null,
+        "error": "Error message",
+        "fileUrl": "Original file URL"
+      }
+    }
+  }
+}
