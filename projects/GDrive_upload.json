@@ -2,7 +2,7 @@
   "id": "proj_gdrive_upload",
   "name": "GDrive_upload",
   "createdAt": "2025-09-27T20:03:21.547Z",
-  "updatedAt": "2025-10-13T20:17:36.873Z",
+  "updatedAt": "2025-10-13T20:20:39.078Z",
   "status": "synced",
   "workflow": {
     "createdAt": "2025-09-27T20:03:21.547Z",
@@ -630,7 +630,7 @@
     "tags": []
   },
   "metadata": {
-    "version": "1.0.2",
+    "version": "1.0.3",
     "author": "Mykhailo Bielov",
     "description": "Advanced Google Drive file upload workflow with folder management, duplicate detection, and public sharing",
     "tags": [
@@ -644,7 +644,7 @@
       "repository": "https://github.com/belmic/n8n_projects",
       "branch": "main",
       "synced": false,
-      "lastSync": "2025-10-13T20:17:36.874Z"
+      "lastSync": "2025-10-13T20:20:39.079Z"
     },
     "workflowDetails": {
       "nodes": 17,
