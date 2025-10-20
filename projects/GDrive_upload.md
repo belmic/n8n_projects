@@ -1,24 +1,26 @@
 # GDrive_upload
 
 ## Overview
-Advanced Google Drive file upload workflow with intelligent folder management, duplicate detection, and public sharing capabilities. This workflow downloads files from URLs, organizes them in Google Drive folders, and provides public access links.
+Advanced Google Drive file upload workflow with intelligent folder management, duplicate detection, and public sharing capabilities. This workflow downloads files from URLs, organizes them in Google Drive folders, and provides public access links. Now integrated as a subworkflow in the enhanced openworksheet automation system.
 
 ## Project Details
 - **ID**: proj_gdrive_upload
 - **Created**: 2025-09-27T20:03:21.547Z
-- **Updated**: 2025-09-29T06:24:32.198Z
+- **Updated**: 2025-10-13T18:48:48.342Z
 - **Status**: synced
 - **Author**: Mykhailo Bielov
+- **Workflow ID**: Yxs70uuQ2IMHaXP9
 
 ## Workflow Information
 - **Nodes**: 17
 - **Connections**: 16
 - **Active**: No
 - **Trigger Type**: Execute Workflow Trigger
-- **Execution Frequency**: On-demand
+- **Execution Frequency**: On-demand (can be called as subworkflow)
 - **Data Source**: External API/URL
 - **Data Destination**: Google Drive
 - **Complexity**: Advanced
+- **Integration**: Used as subworkflow in openworksheet_enhanced
 
 ## Workflow Architecture
 
@@ -250,15 +252,58 @@ build_drive_url (Generate access URLs)
 - **fileUrl**: Must be accessible URL
 - **fileName**: Optional, will be auto-generated if not provided
 
+## Subworkflow Integration
+
+### Integration with openworksheet_enhanced
+This workflow is now integrated as a subworkflow in the enhanced openworksheet automation system:
+
+- **Parent Workflow**: openworksheet_enhanced (ID: Q4kPPis9qxXfKtQi)
+- **Integration Point**: Called automatically for items with `status='new'`
+- **Purpose**: Downloads files from URLs found in Excel worksheets and stores them in Google Drive
+- **Folder Structure**: Files are organized by worksheet name (folder column)
+
+### Subworkflow Parameters
+When called as a subworkflow, the following parameters are passed:
+
+```json
+{
+  "parentId": "1wIIIS7mqlCrGnPIfzyov0SPmK4JhoEjn",
+  "folderName": "{{ worksheet_name }}",
+  "fileUrl": "{{ url_from_excel }}",
+  "fileName": null
+}
+```
+
+### Return Values
+The subworkflow returns:
+
+```json
+{
+  "fileId": "Google Drive file ID",
+  "driveViewUrl": "https://drive.google.com/uc?export=view&id=FILE_ID",
+  "driveDirectUrl": "https://drive.google.com/uc?export=download&id=FILE_ID"
+}
+```
+
 ## Usage Examples
 
-### Basic Usage
+### Standalone Usage
 ```json
 {
   "parentId": "1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgvE2upms",
   "folderName": "Uploaded Files",
   "fileUrl": "https://example.com/document.pdf",
   "fileName": "My Document.pdf"
+}
+```
+
+### Subworkflow Usage (openworksheet integration)
+```json
+{
+  "parentId": "1wIIIS7mqlCrGnPIfzyov0SPmK4JhoEjn",
+  "folderName": "Social Media Automation",
+  "fileUrl": "https://example.com/social-tool.pdf",
+  "fileName": null
 }
 ```
 
@@ -323,18 +368,25 @@ build_drive_url (Generate access URLs)
 - `GDrive_upload.md` - This README
 
 ## Version History
-- **v1.0.5**: Updated from n8n instance (2025-10-13)
-- **v1.0.4**: Updated from n8n instance (2025-10-13)
-- **v1.0.3**: Updated from n8n instance (2025-10-13)
-- **v1.0.2**: Updated from n8n instance (2025-10-13)
-- **v1.0.1**: Updated from n8n instance (2025-10-13)
 - **v1.0.0**: Initial implementation with advanced file upload features
 - **v1.0.1**: Enhanced error handling and binary data management
 - **v1.0.2**: Added duplicate detection and public sharing
+- **v1.1.0**: Integrated as subworkflow in openworksheet_enhanced automation system
+- **v1.1.1**: Updated documentation and integration details
 
 ## Related Workflows
-- **openworksheet**: Excel file processing workflow
+- **openworksheet**: Original Excel file processing workflow
+- **openworksheet_enhanced**: Enhanced Excel processing with automatic file download (ID: Q4kPPis9qxXfKtQi)
 - **ScreenNotes**: Document management workflow
+
+### Integration Workflow Details
+The GDrive_upload workflow is now a key component of the openworksheet_enhanced automation:
+
+1. **openworksheet_enhanced** processes Excel worksheets and identifies new items
+2. **GDrive_upload** (this workflow) downloads files from URLs and stores them in Google Drive
+3. **Data Table** is updated with download status and Google Drive links
+
+This creates a complete automation pipeline from Excel data to organized Google Drive storage.
 
 ## Tags
 - google-drive
@@ -342,3 +394,6 @@ build_drive_url (Generate access URLs)
 - file-management
 - automation
 - duplicate-detection
+- subworkflow
+- integration
+- openworksheet

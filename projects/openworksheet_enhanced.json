@@ -1,0 +1,721 @@
+{
+  "createdAt": "2025-10-17T21:30:01.631Z",
+  "updatedAt": "2025-10-18T19:33:07.118Z",
+  "id": "PsH1mpDtvBewDzWb",
+  "name": "openworksheet_v2",
+  "active": false,
+  "isArchived": false,
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {}
+          ]
+        }
+      },
+      "id": "schedule-trigger",
+      "name": "Schedule Trigger",
+      "position": [
+        -16,
+        0
+      ],
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2
+    },
+    {
+      "parameters": {
+        "jsCode": "// Generate a list of all worksheets to process\nconst worksheets = [\n  'Social Media Automation',\n  'AI & Content Generation', \n  'Data Sync & ETL',\n  'Other',\n  'E-commerce & Payments',\n  'Chatbots & Messaging',\n  'Email & CRM',\n  'Monitoring, Logging & DevOps',\n  'Forms, Surveys & Feedback',\n  'File & Document Management',\n  'Webhooks & API Orchestration',\n  'Notifications & Alerts',\n  'Calendar & Scheduling'\n];\n\n// Return each worksheet as a separate item\nreturn worksheets.map(worksheetName => ({\n  json: {\n    worksheetName: worksheetName,\n    fileId: '19uFAoelq1ug9ogm8eEN6YcgIGouein6r'\n  }\n}));"
+      },
+      "id": "ws-list",
+      "name": "ws_list",
+      "position": [
+        208,
+        0
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "loop-over-ws",
+      "name": "loop_over_ws",
+      "position": [
+        416,
+        0
+      ],
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "={{ $json.fileId }}"
+        },
+        "options": {}
+      },
+      "id": "download",
+      "name": "download",
+      "position": [
+        656,
+        16
+      ],
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "8rSm3dJNel8Qc1SP",
+          "name": "Google Drive"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "xlsx",
+        "options": {
+          "headerRow": true,
+          "sheetName": "={{ $json.worksheetName }}"
+        }
+      },
+      "id": "extract",
+      "name": "extract",
+      "position": [
+        864,
+        16
+      ],
+      "type": "n8n-nodes-base.extractFromFile",
+      "typeVersion": 1
+    },
+    {
+      "parameters": {
+        "jsCode": "// Add the worksheet name as the folder for each item\nconst worksheetName = $('loop_over_ws').item.json.worksheetName;\n\nreturn $input.all().map(item => ({\n  json: {\n    name: item.json.name,\n    description: item.json.description || '',\n    url: item.json.url || '',\n    score: item.json.score || 0,\n    folder: worksheetName,\n    status: 'new',\n    createdAt: new Date().toISOString(),\n    updatedAt: new Date().toISOString()\n  }\n}));"
+      },
+      "id": "add-folder-name",
+      "name": "add_folder_name",
+      "position": [
+        1072,
+        16
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "INSERT INTO n8n_prj.openworksheet_enhanced (name, description, url, score, folder, status, created_at, updated_at) \nVALUES ('{{ $json.name }}', '{{ $json.description }}', '{{ $json.url }}', {{ $json.score }}, '{{ $json.folder }}', '{{ $json.status }}', NOW(), NOW()) \nON CONFLICT (name) DO NOTHING;",
+        "options": {}
+      },
+      "id": "create-postgres",
+      "name": "create_postgres",
+      "position": [
+        1488,
+        16
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "KjLGUJ2hSeiKzQmU",
+          "name": "RW_Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT * FROM n8n_prj.openworksheet_enhanced WHERE status = 'new';",
+        "options": {}
+      },
+      "id": "get-new-items",
+      "name": "get_new_items",
+      "position": [
+        224,
+        320
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "KjLGUJ2hSeiKzQmU",
+          "name": "RW_Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "loop-new-items",
+      "name": "loop_new_items",
+      "position": [
+        432,
+        320
+      ],
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3
+    },
+    {
+      "parameters": {
+        "jsCode": "// Prepare data for GDrive upload subworkflow\nconst item = $json;\n\nreturn [{\n  json: {\n    parentId: '1wIIIS7mqlCrGnPIfzyov0SPmK4JhoEjn', // Templates folder\n    folderName: item.folder,\n    fileUrl: item.url,\n    fileName: item.name\n  }\n}];"
+      },
+      "id": "prepare-upload-data",
+      "name": "prepare_upload_data",
+      "position": [
+        640,
+        336
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "workflowId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "NT4q1dgTH0FdskIJ"
+        },
+        "workflowInputs": {
+          "mappingMode": "defineBelow",
+          "value": {},
+          "matchingColumns": [],
+          "schema": [],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": true
+        },
+        "options": {}
+      },
+      "id": "execute-gdrive-upload",
+      "name": "execute_gdrive_upload",
+      "position": [
+        848,
+        336
+      ],
+      "type": "n8n-nodes-base.executeWorkflow",
+      "typeVersion": 1.3
+    },
+    {
+      "parameters": {
+        "jsCode": "// Analyze uploaded file content for n8n workflow features\nconst uploadResult = $json;\nconst originalItem = $('get_new_items').item.json;\n\n// Hardcoded analysis logic (can be replaced with OpenAI)\nfunction analyzeWorkflowFeatures(url, description, name) {\n  const features = [];\n  const nodeTypes = [];\n  const services = [];\n  const audience = [];\n  let complexity = 'simple';\n  let setupTime = 15;\n  \n  const text = `${name} ${description} ${url}`.toLowerCase();\n  \n  // Analyze features based on keywords\n  if (text.includes('slack') || text.includes('notification')) {\n    features.push('slack-integration');\n    nodeTypes.push('n8n-nodes-base.slack');\n    services.push('slack');\n  }\n  \n  if (text.includes('webhook') || text.includes('api')) {\n    features.push('webhook-processing');\n    nodeTypes.push('n8n-nodes-base.webhook');\n    nodeTypes.push('n8n-nodes-base.httpRequest');\n  }\n  \n  if (text.includes('ai') || text.includes('openai') || text.includes('gpt')) {\n    features.push('ai-integration');\n    nodeTypes.push('@n8n/n8n-nodes-langchain.lmChatOpenAi');\n    services.push('openai');\n    complexity = 'advanced';\n    setupTime = 45;\n  }\n  \n  if (text.includes('email') || text.includes('gmail')) {\n    features.push('email-automation');\n    nodeTypes.push('n8n-nodes-base.gmail');\n    services.push('gmail');\n  }\n  \n  if (text.includes('google') || text.includes('drive') || text.includes('sheets')) {\n    features.push('google-integration');\n    nodeTypes.push('n8n-nodes-base.googleDrive');\n    nodeTypes.push('n8n-nodes-base.googleSheets');\n    services.push('google');\n  }\n  \n  if (text.includes('schedule') || text.includes('cron')) {\n    features.push('scheduling');\n    nodeTypes.push('n8n-nodes-base.scheduleTrigger');\n  }\n  \n  if (text.includes('data') || text.includes('sync') || text.includes('etl')) {\n    features.push('data-processing');\n    nodeTypes.push('n8n-nodes-base.splitInBatches');\n    nodeTypes.push('n8n-nodes-base.merge');\n  }\n  \n  // Determine target audience\n  if (text.includes('marketing') || text.includes('social')) {\n    audience.push('marketers');\n  }\n  if (text.includes('developer') || text.includes('api') || text.includes('webhook')) {\n    audience.push('developers');\n  }\n  if (text.includes('data') || text.includes('analytics') || text.includes('report')) {\n    audience.push('analysts');\n  }\n  \n  // Adjust complexity based on features\n  if (features.length > 5) {\n    complexity = 'advanced';\n    setupTime = 60;\n  } else if (features.length > 2) {\n    complexity = 'intermediate';\n    setupTime = 30;\n  }\n  \n  return {\n    features,\n    nodeTypes,\n    services,\n    audience,\n    complexity,\n    setupTime\n  };\n}\n\n// Perform analysis\nconst analysis = analyzeWorkflowFeatures(\n  originalItem.url,\n  originalItem.description,\n  originalItem.name\n);\n\nreturn [{\n  json: {\n    id: originalItem.id,\n    file_url: uploadResult.fileUrl || uploadResult.url,\n    file_id: uploadResult.fileId,\n    analyzed_features: analysis.features,\n    node_types_found: analysis.nodeTypes,\n    complexity_analysis: analysis.complexity,\n    setup_time_estimate: analysis.setupTime,\n    target_audience: analysis.audience,\n    required_services: analysis.services,\n    status: 'analyzed'\n  }\n}];"
+      },
+      "id": "analyze-workflow",
+      "name": "analyze_workflow",
+      "position": [
+        1056,
+        336
+      ],
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "schema": {
+          "__rl": true,
+          "value": "n8n_prj",
+          "mode": "list",
+          "cachedResultName": "n8n_prj"
+        },
+        "table": {
+          "__rl": true,
+          "value": "openworksheet_enhanced",
+          "mode": "list",
+          "cachedResultName": "openworksheet_enhanced"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "status": "={{ $json.status }}",
+            "file_id": "={{ $json.file_id }}",
+            "file_url": "={{ $json.file_url }}",
+            "analyzed_features": "={{ $json.analyzed_features }}",
+            "node_types_found": "={{ $json.node_types_found }}",
+            "complexity_analysis": "={{ $json.complexity_analysis }}",
+            "setup_time_estimate": "={{ $json.setup_time_estimate }}",
+            "target_audience": "={{ $json.target_audience }}",
+            "required_services": "={{ $json.required_services }}",
+            "id": "={{ $json.id }}"
+          },
+          "matchingColumns": [
+            "id"
+          ],
+          "schema": [
+            {
+              "id": "id",
+              "displayName": "id",
+              "required": false,
+              "defaultMatch": true,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "status",
+              "displayName": "status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "folder",
+              "displayName": "folder",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "name",
+              "displayName": "name",
+              "required": true,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "description",
+              "displayName": "description",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "url",
+              "displayName": "url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "score",
+              "displayName": "score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "file_url",
+              "displayName": "file_url",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "file_id",
+              "displayName": "file_id",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "analyzed_features",
+              "displayName": "analyzed_features",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "array",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "node_types_found",
+              "displayName": "node_types_found",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "array",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "complexity_analysis",
+              "displayName": "complexity_analysis",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "setup_time_estimate",
+              "displayName": "setup_time_estimate",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "target_audience",
+              "displayName": "target_audience",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "array",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "required_services",
+              "displayName": "required_services",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "array",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "created_at",
+              "displayName": "created_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "updated_at",
+              "displayName": "updated_at",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "dateTime",
+              "canBeUsedToMatch": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "update-analysis",
+      "name": "update_analysis",
+      "position": [
+        1264,
+        336
+      ],
+      "type": "n8n-nodes-base.postgres",
+      "typeVersion": 2.6,
+      "credentials": {
+        "postgres": {
+          "id": "KjLGUJ2hSeiKzQmU",
+          "name": "RW_Supabase"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Enhanced statistics with database query results\nconst currentDate = new Date().toLocaleDateString('en-US', {\n  weekday: 'long',\n  year: 'numeric',\n  month: 'long',\n  day: 'numeric',\n  hour: '2-digit',\n  minute: '2-digit'\n});\n\n// Get execution statistics from workflow context\nconst executionStats = {\n  worksheetsProcessed: $('ws_list').all().length,\n  totalProcessed: $('loop_over_ws').all().length,\n  newItemsAdded: $('create_postgres').all().length,\n  itemsAnalyzed: $('update_analysis').all().length,\n  filesUploaded: $('execute_gdrive_upload').all().length\n};\n\n// Calculate success rate\nconst successRate = executionStats.totalProcessed > 0 \n  ? Math.round((executionStats.itemsAnalyzed / executionStats.totalProcessed) * 100)\n  : 0;\n\n// Get current time for processing duration\nconst startTime = new Date();\nconst processingDuration = Math.round((startTime - new Date()) / 1000); // in seconds\n\n// Build detailed email message\nconst emailMessage = `\n📊 OpenWorksheet Processing Report\n================================\n\n📅 Execution Date: ${currentDate}\n\n📈 Processing Statistics:\n• Worksheets Processed: ${executionStats.worksheetsProcessed}\n• Total Items Processed: ${executionStats.totalProcessed}\n• New Items Added: ${executionStats.newItemsAdded}\n• Items Analyzed: ${executionStats.itemsAnalyzed}\n• Files Uploaded: ${executionStats.filesUploaded}\n• Success Rate: ${successRate}%\n\n⏱️ Processing Details:\n• Processing Duration: ${processingDuration} seconds\n• Average Items per Worksheet: ${executionStats.worksheetsProcessed > 0 ? Math.round(executionStats.totalProcessed / executionStats.worksheetsProcessed) : 0}\n\n✅ Workflow Status: Completed Successfully\n\n🔍 Next Steps:\n• Review analyzed workflows in the database\n• Check uploaded files in Google Drive\n• Monitor template discovery system\n• Verify AI analysis results\n\n📋 Categories Processed:\n• Social Media Automation\n• AI & Content Generation\n• Data Sync & ETL\n• E-commerce & Payments\n• Chatbots & Messaging\n• Email & CRM\n• Monitoring, Logging & DevOps\n• Forms, Surveys & Feedback\n• File & Document Management\n• Webhooks & API Orchestration\n• Notifications & Alerts\n• Calendar & Scheduling\n\n🎯 Analysis Features Detected:\n• Workflow complexity assessment\n• Node type identification\n• Target audience classification\n• Required services mapping\n• Setup time estimation\n\n---\nGenerated by OpenWorksheet Enhanced Workflow v2.1\nDatabase: n8n_prj.openworksheet_enhanced\nLast Updated: ${new Date().toISOString()}\n`;\n\nreturn [{\n  json: {\n    subject: `OpenWorksheet Processing Report - ${currentDate}`,\n    message: emailMessage,\n    recipient: 'mic.belov@gmail.com',\n    stats: executionStats,\n    executionDate: currentDate,\n    successRate: successRate,\n    processingDuration: processingDuration\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        432,
+        592
+      ],
+      "id": "5791304c-e5a6-4d60-b0c1-612395e1f674",
+      "name": "build_statistics"
+    },
+    {
+      "parameters": {
+        "authentication": "serviceAccount",
+        "sendTo": "mic.belov@gmail.com",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.gmail",
+      "typeVersion": 2.1,
+      "position": [
+        624,
+        592
+      ],
+      "id": "c5e7ecdc-7327-4019-aa55-b0253a2302be",
+      "name": "Send a message",
+      "webhookId": "528b444f-37bb-4fbb-b0ac-b6a308dd864f",
+      "credentials": {
+        "googleApi": {
+          "id": "AgvhDEOyfJMWJtfl",
+          "name": "Google Service Account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// Sanitize data for PostgreSQL insertion\nfunction sanitizeForPostgres(value) {\n  if (typeof value !== 'string') return value;\n  \n  // Replace problematic characters\n  return value\n    .replace(/\\\\/g, '\\\\\\\\')        // Backslash\n    .replace(/'/g, \"''\")           // Single quote\n    .replace(/\"/g, '\\\\\"')          // Double quote\n    .replace(/\\0/g, '\\\\0')         // Null byte\n    .replace(/\\b/g, '\\\\b')         // Backspace\n    .replace(/\\n/g, '\\\\n')         // Newline\n    .replace(/\\r/g, '\\\\r')         // Carriage return\n    .replace(/\\t/g, '\\\\t')         // Tab\n    .replace(/\\f/g, '\\\\f')         // Form feed\n    .replace(/\\v/g, '\\\\v')         // Vertical tab\n    .replace(/@/g, '\\\\@')           // At symbol (your specific issue)\n    .replace(/\\$/g, '\\\\$')         // Dollar sign\n    .replace(/%/g, '\\\\%')          // Percent\n    .replace(/\\?/g, '\\\\?')         // Question mark\n    .replace(/\\[/g, '\\\\[')          // Square brackets\n    .replace(/\\]/g, '\\\\]')         // Square brackets\n    .replace(/\\(/g, '\\\\(')         // Parentheses\n    .replace(/\\)/g, '\\\\)')         // Parentheses\n    .replace(/\\{/g, '\\\\{')         // Curly braces\n    .replace(/\\}/g, '\\\\}')         // Curly braces\n    .replace(/\\|/g, '\\\\|')         // Pipe\n    .replace(/\\^/g, '\\\\^')         // Caret\n    .replace(/~/g, '\\\\~')          // Tilde\n    .replace(/`/g, '\\\\`'); \n}\n\n// Process each item\nreturn $input.all().map(item => ({\n  json: {\n    name: sanitizeForPostgres(item.json.name),\n    description: sanitizeForPostgres(item.json.description),\n    url: sanitizeForPostgres(item.json.url),\n    score: item.json.score,\n    folder: sanitizeForPostgres(item.json.folder),\n    status: sanitizeForPostgres(item.json.status),\n    createdAt: item.json.createdAt,\n    updatedAt: item.json.updatedAt\n  }\n}));"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1280,
+        16
+      ],
+      "id": "5fc1ea0c-fdde-4e9e-9c79-70b03a9fd8ca",
+      "name": "sanitize_data"
+    }
+  ],
+  "connections": {
+    "Schedule Trigger": {
+      "main": [
+        [
+          {
+            "node": "ws_list",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "add_folder_name": {
+      "main": [
+        [
+          {
+            "node": "sanitize_data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "analyze_workflow": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "update_analysis",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "create_postgres": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "loop_over_ws",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "download": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "extract",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "execute_gdrive_upload": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "analyze_workflow",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "extract": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "add_folder_name",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "get_new_items": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "loop_new_items",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "loop_new_items": {
+      "main": [
+        [
+          {
+            "node": "build_statistics",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "prepare_upload_data",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "loop_over_ws": {
+      "main": [
+        [
+          {
+            "node": "get_new_items",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "index": 0,
+            "node": "download",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "prepare_upload_data": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "execute_gdrive_upload",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "update_analysis": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "loop_new_items",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "ws_list": {
+      "main": [
+        [
+          {
+            "index": 0,
+            "node": "loop_over_ws",
+            "type": "main"
+          }
+        ]
+      ]
+    },
+    "build_statistics": {
+      "main": [
+        []
+      ]
+    },
+    "sanitize_data": {
+      "main": [
+        [
+          {
+            "node": "create_postgres",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": true
+  },
+  "pinData": {},
+  "versionId": "d030b111-a2f3-491e-b65e-ecafaa4e6d03",
+  "triggerCount": 0,
+  "shared": [
+    {
+      "createdAt": "2025-10-17T21:30:01.631Z",
+      "updatedAt": "2025-10-17T21:30:01.631Z",
+      "role": "workflow:owner",
+      "workflowId": "PsH1mpDtvBewDzWb",
+      "projectId": "q3w2LTZBOQaMnapN",
+      "project": {
+        "createdAt": "2025-06-19T19:10:02.873Z",
+        "updatedAt": "2025-06-19T19:27:56.091Z",
+        "id": "q3w2LTZBOQaMnapN",
+        "name": "Mykhailo Bielov <mic.belov@gmail.com>",
+        "type": "personal",
+        "icon": null,
+        "description": null,
+        "projectRelations": [
+          {
+            "createdAt": "2025-06-19T19:10:02.873Z",
+            "updatedAt": "2025-06-19T19:10:02.873Z",
+            "userId": "d77898c9-3f06-4caf-bb7c-709eb64519d3",
+            "projectId": "q3w2LTZBOQaMnapN",
+            "user": {
+              "createdAt": "2025-06-19T19:09:59.870Z",
+              "updatedAt": "2025-10-18T07:10:35.110Z",
+              "id": "d77898c9-3f06-4caf-bb7c-709eb64519d3",
+              "email": "mic.belov@gmail.com",
+              "firstName": "Mykhailo",
+              "lastName": "Bielov",
+              "personalizationAnswers": {
+                "version": "v4",
+                "personalization_survey_submitted_at": "2025-06-19T19:28:25.666Z",
+                "personalization_survey_n8n_version": "1.98.2",
+                "companySize": "<20",
+                "companyType": "education",
+                "role": "business-owner",
+                "reportedSource": "google"
+              },
+              "settings": {
+                "userActivated": true,
+                "firstSuccessfulWorkflowId": "8HqEBFxiW4D0JcNZ",
+                "userActivatedAt": 1755203494225,
+                "npsSurvey": {
+                  "responded": true,
+                  "lastShownAt": 1751139170083
+                },
+                "easyAIWorkflowOnboarded": true
+              },
+              "disabled": false,
+              "mfaEnabled": false,
+              "lastActiveAt": "2025-10-18",
+              "isPending": false
+            }
+          }
+        ]
+      }
+    }
+  ],
+  "tags": []
+}

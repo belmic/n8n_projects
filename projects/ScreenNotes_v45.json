@@ -1,0 +1,210 @@
+{
+  "id": "proj_2w6rbnufy",
+  "name": "ScreenNotes_v45",
+  "createdAt": "2025-10-20T22:06:58.553Z",
+  "updatedAt": "2025-10-20T22:07:30.000Z",
+  "status": "synced",
+  "workflow": {
+    "createdAt": "2025-10-19T21:17:40.616Z",
+    "updatedAt": "2025-10-20T21:59:46.073Z",
+    "id": "5VQTBLRU5ZQEVOjN",
+    "name": "ScreenNotes v.4.5",
+    "active": true,
+    "isArchived": false,
+    "nodes": [
+      {
+        "parameters": {
+          "updates": [
+            "message"
+          ],
+          "additionalFields": {
+            "download": false
+          }
+        },
+        "type": "n8n-nodes-base.telegramTrigger",
+        "typeVersion": 1.2,
+        "position": [
+          -176,
+          80
+        ],
+        "id": "8d0c6c28-abae-48fa-aab0-90814ff26f94",
+        "name": "Start",
+        "webhookId": "5428366b-57a2-4c0c-998e-e27ee0fc177b",
+        "credentials": {
+          "telegramApi": {
+            "id": "VOYibrgljcdGx8q9",
+            "name": "ScreenNotes"
+          }
+        }
+      }
+    ],
+    "connections": {
+      "Start": {
+        "main": [
+          [
+            {
+              "node": "init_config",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "staticData": null,
+    "meta": null,
+    "pinData": {
+      "Start": [
+        {
+          "json": {
+            "update_id": 965371470,
+            "message": {
+              "message_id": 100,
+              "from": {
+                "id": 394819858,
+                "is_bot": false,
+                "first_name": "Mikhail",
+                "last_name": "Belov",
+                "username": "mic_belov",
+                "language_code": "ru"
+              },
+              "chat": {
+                "id": 394819858,
+                "first_name": "Mikhail",
+                "last_name": "Belov",
+                "username": "mic_belov",
+                "type": "private"
+              },
+              "date": 1760994735,
+              "photo": [
+                {
+                  "file_id": "AgACAgIAAxkBAANkaPalr1ID9R2tF2LG_kbeDFWg3NgAAgX6MRsJ_rFLfNppuypvR9cBAAMCAANzAAM2BA",
+                  "file_unique_id": "AQADBfoxGwn-sUt4",
+                  "file_size": 1170,
+                  "width": 42,
+                  "height": 90
+                },
+                {
+                  "file_id": "AgACAgIAAxkBAANkaPalr1ID9R2tF2LG_kbeDFWg3NgAAgX6MRsJ_rFLfNppuypvR9cBAAMCAANtAAM2BA",
+                  "file_unique_id": "AQADBfoxGwn-sUty",
+                  "file_size": 14788,
+                  "width": 148,
+                  "height": 320
+                },
+                {
+                  "file_id": "AgACAgIAAxkBAANkaPalr1ID9R2tF2LG_kbeDFWg3NgAAgX6MRsJ_rFLfNppuypvR9cBAAMCAAN4AAM2BA",
+                  "file_unique_id": "AQADBfoxGwn-sUt9",
+                  "file_size": 60773,
+                  "width": 369,
+                  "height": 800
+                },
+                {
+                  "file_id": "AgACAgIAAxkBAANkaPalr1ID9R2tF2LG_kbeDFWg3NgAAgX6MRsJ_rFLfNppuypvR9cBAAMCAAN5AAM2BA",
+                  "file_unique_id": "AQADBfoxGwn-sUt-",
+                  "file_size": 100005,
+                  "width": 590,
+                  "height": 1280
+                }
+              ]
+            }
+          }
+        ]
+      }
+    },
+    "versionId": "5244b4b9-6f9f-4829-b7df-6aa0d1ff87d0",
+    "triggerCount": 1,
+    "shared": [
+      {
+        "createdAt": "2025-10-19T21:17:40.616Z",
+        "updatedAt": "2025-10-19T21:17:40.616Z",
+        "role": "workflow:owner",
+        "workflowId": "5VQTBLRU5ZQEVOjN",
+        "projectId": "q3w2LTZBOQaMnapN",
+        "project": {
+          "createdAt": "2025-06-19T19:10:02.873Z",
+          "updatedAt": "2025-06-19T19:27:56.091Z",
+          "id": "q3w2LTZBOQaMnapN",
+          "name": "Mykhailo Bielov <mic.belov@gmail.com>",
+          "type": "personal",
+          "icon": null,
+          "description": null,
+          "projectRelations": [
+            {
+              "createdAt": "2025-06-19T19:10:02.873Z",
+              "updatedAt": "2025-06-19T19:10:02.873Z",
+              "userId": "d77898c9-3f06-4caf-bb7c-709eb64519d3",
+              "projectId": "q3w2LTZBOQaMnapN",
+              "user": {
+                "createdAt": "2025-06-19T19:09:59.870Z",
+                "updatedAt": "2025-10-20T17:20:28.067Z",
+                "id": "d77898c9-3f06-4caf-bb7c-709eb64519d3",
+                "email": "mic.belov@gmail.com",
+                "firstName": "Mykhailo",
+                "lastName": "Bielov",
+                "personalizationAnswers": {
+                  "version": "v4",
+                  "personalization_survey_submitted_at": "2025-06-19T19:28:25.666Z",
+                  "personalization_survey_n8n_version": "1.98.2",
+                  "companySize": "<20",
+                  "companyType": "education",
+                  "role": "business-owner",
+                  "reportedSource": "google"
+                },
+                "settings": {
+                  "userActivated": true,
+                  "firstSuccessfulWorkflowId": "8HqEBFxiW4D0JcNZ",
+                  "userActivatedAt": 1755203494225,
+                  "npsSurvey": {
+                    "responded": true,
+                    "lastShownAt": 1751139170083
+                  },
+                  "easyAIWorkflowOnboarded": true
+                },
+                "disabled": false,
+                "mfaEnabled": false,
+                "lastActiveAt": "2025-10-20",
+                "isPending": false
+              }
+            }
+          ]
+        }
+      }
+    ],
+    "tags": [
+      {
+        "createdAt": "2025-06-20T09:55:51.417Z",
+        "updatedAt": "2025-06-20T09:55:51.417Z",
+        "id": "buzWDBiL7XyI4bpf",
+        "name": "GDrive"
+      },
+      {
+        "createdAt": "2025-06-20T09:57:00.063Z",
+        "updatedAt": "2025-06-20T09:57:00.063Z",
+        "id": "HmThOLiZNW7fkmdA",
+        "name": "OpenAI"
+      },
+      {
+        "createdAt": "2025-09-29T09:22:13.989Z",
+        "updatedAt": "2025-09-29T09:22:13.989Z",
+        "id": "hV2UD2aQ4IpLoDkS",
+        "name": "Notion"
+      }
+    ]
+  },
+  "metadata": {
+    "version": "1.0.0",
+    "author": "admin",
+    "description": "n8n workflow: ScreenNotes v.4.5 - Telegram bot for screenshot processing with Notion integration",
+    "tags": ["GDrive", "OpenAI", "Notion"],
+    "nodeCount": 1,
+    "connectionCount": 1,
+    "github": {
+      "repository": null,
+      "branch": "main",
+      "synced": false
+    }
+  }
+}

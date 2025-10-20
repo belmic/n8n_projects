@@ -1,9 +1,17 @@
 {
-  "name": "ScreenNotes v.4.0",
+  "name": "ScreenNotes v.4.2",
   "active": true,
+  "workflowId": "5VQTBLRU5ZQEVOjN",
+  "version": "4.2",
+  "createdAt": "2025-10-19T21:17:40.616Z",
+  "updatedAt": "2025-10-19T21:23:32.309Z",
+  "nodeCount": 40,
+  "connectionCount": 37,
+  "triggerType": "Telegram Trigger",
+  "aiIntegration": "OpenAI GPT-4o-mini",
   "nodes": [
-    {
-      "parameters": {
+      {
+        "parameters": {
         "updates": [
           "message"
         ],
@@ -28,7 +36,7 @@
       }
     },
     {
-      "parameters": {
+        "parameters": {
         "jsCode": "/**\n * extract_file_id (uses ONLY $items('start'))\n * - Reads Telegram update strictly from $items('start')[0].json\n * - Priority: largest photo → document → video → animation → sticker\n * - Returns: { chat_id, file_id, caption, file_name, content_kind, has_media, token }\n */\n\nfunction largestPhoto(photos) {\n  if (!Array.isArray(photos) || photos.length === 0) return null;\n  const sorted = [...photos].sort((a, b) => (a.file_size || 0) - (b.file_size || 0));\n  return sorted.at(-1) || null;\n}\n\nfunction firstText(...vals) {\n  for (const v of vals) if (typeof v === 'string' && v.trim()) return v;\n  return '';\n}\n\n// 1) Strictly use the Start node payload\nconst startItem = $items('Start')?.[0]?.json || {};\n\n// 2) Pick the effective Telegram message object from Start\n//    (covers common Telegram update shapes)\nconst m =\n  startItem.message ||\n  startItem.edited_message ||\n  startItem.channel_post ||\n  startItem.edited_channel_post ||\n  (startItem.callback_query ? startItem.callback_query.message : null) ||\n  {};\n\n// 3) Extract chat_id\nconst chat_id =\n  (m.chat && typeof m.chat.id !== 'undefined') ? m.chat.id :\n  (startItem.callback_query && startItem.callback_query.from && typeof startItem.callback_query.from.id !== 'undefined')\n    ? startItem.callback_query.from.id\n    : null;\n\n// 4) Extract media file_id by priority\nlet file_id = null;\nlet content_kind = null;\n\nconst ph = largestPhoto(m.photo);\nif (ph?.file_id) {\n  file_id = ph.file_id;\n  content_kind = 'photo';\n} else if (m.document?.file_id) {\n  file_id = m.document.file_id;\n  content_kind = 'document';\n} else if (m.video?.file_id) {\n  file_id = m.video.file_id;\n  content_kind = 'video';\n} else if (m.animation?.file_id) {\n  file_id = m.animation.file_id;\n  content_kind = 'animation';\n} else if (m.sticker?.file_id) {\n  file_id = m.sticker.file_id;\n  content_kind = 'sticker';\n}\n\n// 5) Caption/text and a reasonable file name\nconst caption = firstText(m.caption, m.text);\nconst file_name =\n  m?.document?.file_name ||\n  m?.video?.file_name ||\n  (content_kind === 'photo' ? `photo_${Date.now()}.jpg` : `file_${Date.now()}`);\n\n// 6) Read token ONLY from init_config\nconst token = $items('init_config')?.[0]?.json?.TELEGRAM_BOT_TOKEN || null;\n\n// 7) Output\nreturn [{\n  json: {\n    chat_id,\n    file_id,\n    caption,\n    file_name,\n    content_kind,\n    has_media: !!file_id,\n    token\n  }\n}];\n"
       },
       "type": "n8n-nodes-base.code",
@@ -41,7 +49,7 @@
       "name": "extract_file_id"
     },
     {
-      "parameters": {
+        "parameters": {
         "jsCode": "/**\n * Simplified init_config - Single source of truth for field definitions\n * \n * TO ADD A NEW FIELD:\n * 1. Add it to the FIELDS array below\n * 2. Add prompt description\n * 3. Everything else is automatic\n */\n\nconst FIELDS = [\n  // === CORE FIELDS (always present) ===\n  {\n    name: \"Title\",\n    type: \"title\",\n    prompt: \"Short human-readable title from the main on-image heading; else concise summary (≤80 chars).\",\n    required: true,\n    alwaysShow: true\n  },\n  {\n    name: \"Type\", \n    type: \"select\",\n    options: [\"Note\", \"Product\", \"Contact\", \"Event\"],\n    prompt: \"Classify the screenshot into exactly one of: Product, Contact, Event, Note.\",\n    required: true,\n    alwaysShow: true\n  },\n  {\n    name: \"Category\",\n    type: \"select\", \n    options: [],\n    prompt: \"Optional subcategory (e.g., electronics, restaurant, conference). Null if unsure.\",\n    alwaysShow: true\n  },\n  {\n    name: \"Tags\",\n    type: \"multi_select\",\n    prompt: \"3–7 keywords; deduplicate; keep source language; no # and no emojis.\",\n    alwaysShow: true\n  },\n  {\n    name: \"Summary\",\n    type: \"rich_text\",\n    prompt: \"2–5 sentences summary using only visible info from the screenshot.\",\n    alwaysShow: true\n  },\n  {\n    name: \"Key facts\",\n    type: \"rich_text\", \n    prompt: \"Markdown bullets with actionable facts from the screenshot only (one fact per bullet).\",\n    alwaysShow: true\n  },\n  {\n    name: \"Source URL\",\n    type: \"url\",\n    prompt: \"Public source link if explicitly visible/copyable on screenshot; else null.\",\n    alwaysShow: true\n  },\n  {\n    name: \"Screenshot\",\n    type: \"files\",\n    prompt: \"Leave null — pipeline sets the public URL later.\",\n    alwaysShow: true,\n    autoGenerated: true\n  },\n  {\n    name: \"Captured at\",\n    type: \"date\",\n    prompt: \"Auto-generated timestamp when item was captured.\",\n    alwaysShow: true,\n    autoGenerated: true,\n    readOnly: true\n  },\n  {\n    name: \"Status\",\n    type: \"select\",\n    options: [\"New\", \"Processed\"],\n    prompt: \"Processing status of the item.\",\n    alwaysShow: true\n  },\n  {\n    name: \"Confidence\",\n    type: \"number\",\n    prompt: \"Self-estimated confidence 0..1 (float). Lower it if any required field is missing/uncertain.\",\n    alwaysShow: true\n  },\n  {\n    name: \"Lang\",\n    type: \"select\",\n    options: [\"en\", \"ru\", \"uk\", \"auto\"],\n    prompt: \"Dominant OCR language code of the screenshot text. Do not translate output.\",\n    alwaysShow: true\n  },\n  {\n    name: \"Channel\",\n    type: \"select\",\n    options: [\"Telegram Bot\"],\n    prompt: \"Fixed: 'Telegram Bot' unless specified otherwise.\",\n    alwaysShow: true,\n    autoGenerated: true\n  },\n  {\n    name: \"UID\",\n    type: \"rich_text\",\n    prompt: \"Unique identifier for the item.\",\n    alwaysShow: true,\n    readOnly: true,\n    autoGenerated: true\n  },\n\n  // === PRODUCT FIELDS (only when Type = \"Product\") ===\n  {\n    name: \"product_Price\",\n    type: \"number\",\n    prompt: \"Numeric price if visible; else null.\",\n    showWhen: \"Type === 'Product'\"\n  },\n  {\n    name: \"product_Currency\", \n    type: \"select\",\n    options: [\"USD\", \"EUR\", \"UAH\"],\n    prompt: \"ISO currency inferred from symbol/text; else null.\",\n    showWhen: \"Type === 'Product'\"\n  },\n  {\n    name: \"product_Vendor\",\n    type: \"rich_text\",\n    prompt: \"Store or brand name if present; else null.\",\n    showWhen: \"Type === 'Product'\"\n  },\n  {\n    name: \"product_StoreURL\",\n    type: \"url\", \n    prompt: \"Product/app page if visible; else null.\",\n    showWhen: \"Type === 'Product'\"\n  },\n\n  // === CONTACT FIELDS (only when Type = \"Contact\") ===\n  {\n    name: \"contact_Email\",\n    type: \"email\",\n    prompt: \"Email if shown; else null.\",\n    showWhen: \"Type === 'Contact'\"\n  },\n  {\n    name: \"contact_Phone\",\n    type: \"phone_number\",\n    prompt: \"Phone (international format if possible) or raw digits; else null.\",\n    showWhen: \"Type === 'Contact'\"\n  },\n  {\n    name: \"contact_Address\",\n    type: \"rich_text\",\n    prompt: \"Postal address lines if shown; else null.\",\n    showWhen: \"Type === 'Contact'\"\n  },\n  {\n    name: \"contact_mapURL\",\n    type: \"url\",\n    prompt: \"Map link if visible; else null.\",\n    showWhen: \"Type === 'Contact'\"\n  },\n  {\n    name: \"contact_Lat\",\n    type: \"number\",\n    prompt: \"Latitude if explicitly shown; else null.\",\n    showWhen: \"Type === 'Contact'\"\n  },\n  {\n    name: \"contact_Lng\", \n    type: \"number\",\n    prompt: \"Longitude if explicitly shown; else null.\",\n    showWhen: \"Type === 'Contact'\"\n  },\n  {\n    name: \"contact_LinkedIn\",\n    type: \"url\",\n    prompt: \"LinkedIn URL/handle if visible; else null.\",\n    showWhen: \"Type === 'Contact'\"\n  },\n  {\n    name: \"contact_Telegram\",\n    type: \"url\",\n    prompt: \"Telegram @handle or link; else null.\",\n    showWhen: \"Type === 'Contact'\"\n  },\n  {\n    name: \"contact_Instagram\",\n    type: \"url\",\n    prompt: \"Instagram @handle or link; else null.\",\n    showWhen: \"Type === 'Contact'\"\n  },\n\n  // === EVENT FIELDS (only when Type = \"Event\") ===\n  {\n    name: \"event_Date\",\n    type: \"date\",\n    prompt: \"Object: { Start: ISO8601, End: ISO8601|null } parsed from the screenshot.\",\n    showWhen: \"Type === 'Event'\"\n  },\n  {\n    name: \"event_DateStart\",\n    type: \"date\", \n    prompt: \"Event start date if present; else null.\",\n    showWhen: \"Type === 'Event'\"\n  },\n  {\n    name: \"event_DateEnd\",\n    type: \"date\",\n    prompt: \"Event end date if present; else null.\",\n    showWhen: \"Type === 'Event'\"\n  },\n  {\n    name: \"event_Email\",\n    type: \"email\",\n    prompt: \"If present; else null.\",\n    showWhen: \"Type === 'Event'\"\n  },\n  {\n    name: \"event_Phone\",\n    type: \"phone_number\",\n    prompt: \"If present; else null.\",\n    showWhen: \"Type === 'Event'\"\n  },\n  {\n    name: \"event_Adddress\",\n    type: \"rich_text\",\n    prompt: \"If present; else null.\",\n    showWhen: \"Type === 'Event'\"\n  },\n  {\n    name: \"event_AddressURL\",\n    type: \"url\",\n    prompt: \"If present; else null.\",\n    showWhen: \"Type === 'Event'\"\n  },\n  {\n    name: \"event_Price\",\n    type: \"number\",\n    prompt: \"Numeric value if shown; else null.\",\n    showWhen: \"Type === 'Event'\"\n  },\n\n  // === NOTES FIELDS (only when Type = \"Note\") ===\n  {\n    name: \"notes_Topic\",\n    type: \"rich_text\",\n    prompt: \"Single-word/short topic if inferable (e.g., 'idea','todo'); else null.\",\n    showWhen: \"Type === 'Note'\"\n  },\n  {\n    name: \"notes_Source\",\n    type: \"rich_text\",\n    prompt: \"If screenshot references a source (doc/app/site); else null.\",\n    showWhen: \"Type === 'Note'\"\n  },\n\n  // === TECHNICAL FIELDS ===\n  {\n    name: \"Chat ID\",\n    type: \"number\",\n    prompt: \"Telegram chat ID for tracking.\",\n    alwaysShow: true\n  }\n];\n\n// === WORKFLOW SETTINGS ===\nconst WORKFLOW_SETTINGS = {\n  // Database settings\n  NOTION_DB_NAME: \"ScreenNotes\",\n  NOTION_PARENT_PAGE_ID: \"283727b4bd4b8084a082d9aa2ce5e9d3\",\n  NOTION_VERSION: \"2022-06-28\",\n  STRICT_DB_NAME_MATCH: true,\n  \n  // Telegram settings  \n  TELEGRAM_BOT_TOKEN: \"8349012441:AAF0_PdT0ltnkii1uX9_L9mm0-o20dZuMuo\",\n  TELEGRAM_PARSE_MODE: \"MarkdownV2\",\n  \n  // Google Drive settings\n  DRIVE_PARENT_ID: \"1GXUsibJx5Ny7r05F9CWGeSuUCrIbH3rU\",\n  DRIVE_LINK_KIND: \"view\",\n  DRIVE_SHARE_ROLE: \"reader\", \n  DRIVE_SHARE_TYPE: \"anyone\",\n  \n  // Default settings\n  DEFAULT_LANG: \"en\",\n  CREATE_DB_IF_MISSING: true,\n  NOTION_SEARCH_LIMIT: 10,\n  MAX_FILE_MB: 40,\n  LOG_LEVEL: \"info\"\n};\n\n// === AUTO-GENERATE CONFIGURATIONS ===\n\n// 1. Generate Notion DB Properties for database creation\nfunction generateNotionProperties(fields) {\n  const properties = {};\n  fields.forEach(field => {\n    const baseProperty = { [field.type]: {} };\n    \n    if (field.options && field.options.length > 0) {\n      baseProperty[field.type].options = field.options.map(opt => ({ name: opt }));\n    }\n    \n    if (field.type === 'number') {\n      baseProperty[field.type].format = 'number';\n    }\n    \n    properties[field.name] = baseProperty;\n  });\n  return properties;\n}\n\n// 2. Generate field prompts for AI\nfunction generateFieldPrompts(fields) {\n  const prompts = {};\n  fields.forEach(field => {\n    if (field.prompt) {\n      prompts[field.name] = field.prompt;\n    }\n  });\n  return prompts;\n}\n\n// 3. Generate DB structure for validation\nfunction generateDBStructure(fields) {\n  return {\n    validFields: fields.map(f => f.name),\n    fieldTypes: Object.fromEntries(fields.map(f => [f.name, f.type])),\n    requiredFields: fields.filter(f => f.required).map(f => f.name),\n    readOnlyFields: fields.filter(f => f.readOnly).map(f => f.name),\n    autoFields: {\n      \"Captured at\": () => new Date().toISOString().slice(0, 10),\n      \"Channel\": () => \"Telegram Bot\"\n    },\n    conditionalFields: fields.filter(f => f.showWhen).map(f => ({\n      name: f.name,\n      condition: f.showWhen\n    }))\n  };\n}\n\n// 4. Generate type-specific field groups\nfunction generateTypeGroups(fields) {\n  const groups = {\n    Product: {},\n    Contact: {},\n    Event: {},\n    Note: {}\n  };\n  \n  fields.forEach(field => {\n    if (field.showWhen) {\n      const type = field.showWhen.replace(\"Type === '\", \"\").replace(\"'\", \"\");\n      if (groups[type]) {\n        groups[type][field.name] = { prompt: field.prompt };\n      }\n    }\n  });\n  \n  return groups;\n}\n\n// === BUILD FINAL CONFIGURATION ===\nconst config = {\n  // Workflow settings\n  ...WORKFLOW_SETTINGS,\n  \n  // Generated configurations\n  NOTION_DB_PROPERTIES: generateNotionProperties(FIELDS),\n  DB_STRUCTURE: generateDBStructure(FIELDS),\n  FIELDS: generateFieldPrompts(FIELDS),\n  PER_TYPE: generateTypeGroups(FIELDS),\n  \n  // AI prompt configuration\n  TYPE_OPTIONS: {\n    Type: {\n      select: { options: FIELDS.find(f => f.name === \"Type\").options.map(name => ({ name })) },\n      prompt: FIELDS.find(f => f.name === \"Type\").prompt\n    }\n  },\n  \n  // Output schema for AI\n  OUTPUT_SCHEMA: {\n    base: Object.fromEntries(\n      FIELDS.filter(f => f.alwaysShow).map(f => [\n        f.name, \n        f.type === 'multi_select' ? 'string[]' : \n        f.type === 'number' ? 'number' : \n        f.type === 'checkbox' ? 'boolean' : 'string|null'\n      ])\n    )\n  },\n  \n  // Policy\n  POLICY: {\n    language: \"Output language = dominant OCR language; never translate.\",\n    missing: \"If a value is not on the screenshot, set it to null and decrease confidence.\",\n    scriptsGuard: \"Do not output ko/ja/zh unless those scripts appear in the screenshot.\"\n  }\n};\n\nreturn [{ json: config }];"
       },
       "type": "n8n-nodes-base.code",
@@ -67,11 +75,11 @@
       "name": "build_create_payload"
     },
     {
-      "parameters": {
+        "parameters": {
         "jsCode": "// === build_update_payload (Simplified) ===\n// Update Notion page dynamically from simplified init_config + merged data.\n// Only includes fields that exist in the database schema.\n\n/************ Helpers ************/\nconst nonEmpty = v => (v!==null && v!==undefined && (typeof v!=='string' || v.trim()!=='') && (!Array.isArray(v) || v.length>0));\nconst toStr = v => (v==null ? '' : String(v));\nconst toNum = v => {\n  if (typeof v === 'number' && isFinite(v)) return v;\n  const n = Number(String(v).replace(/\\s+/g,'').replace(',', '.'));\n  return isFinite(n) ? n : undefined;\n};\nconst toISODate = v => {\n  if (!v) return undefined;\n  if (typeof v === 'string' && /^\\d{4}-\\d{2}-\\d{2}/.test(v)) return v.slice(0,10);\n  if (typeof v === 'string') {\n    const m = v.match(/^(\\d{2})\\.(\\d{2})\\.(\\d{4})$/);\n    if (m) return `${m[3]}-${m[2]}-${m[1]}`;\n  }\n  const d = new Date(v);\n  return isNaN(+d) ? undefined : d.toISOString().slice(0,10);\n};\nconst arr = v => Array.isArray(v) ? v : (v==null ? [] : [v]);\nconst isObj = v => v && typeof v === 'object' && !Array.isArray(v);\n\nfunction inferType(name, value){\n  const s = String(name||'').toLowerCase();\n  if (s.includes('url') || /^https?:\\/\\//i.test(value||'')) return 'url';\n  if (s.endsWith('_email') || s === 'email') return 'email';\n  if (s.endsWith('_phone') || s === 'phone') return 'phone_number';\n  if (s.includes('date')) return 'date';\n  if (s.includes('price') || typeof value === 'number') return 'number';\n  if (s.includes('tags') || Array.isArray(value)) return 'multi_select';\n  if (s.includes('currency') || s.includes('status') || s.includes('type') || s.includes('category') || s.includes('lang') || s.includes('channel')) return 'select';\n  if (s.includes('screenshot') || s.endsWith('_file') || s.endsWith('_image')) return 'files';\n  if (s.includes('checkbox') || typeof value === 'boolean') return 'checkbox';\n  return 'rich_text';\n}\n\nfunction toMulti(val){\n  if (Array.isArray(val)) return val.filter(nonEmpty).map(toStr);\n  if (typeof val === 'string' && val.includes(',')) return val.split(',').map(s=>s.trim()).filter(nonEmpty);\n  return [toStr(val)];\n}\n\nfunction flatten(obj, out = {}) {\n  if (!isObj(obj)) return out;\n  for (const [k, v] of Object.entries(obj)) {\n    out[k] = v;\n    if (isObj(v) && ['data','payload','record','result','results','properties','output'].includes(k)) {\n      for (const [kk, vv] of Object.entries(v)) if (out[kk] === undefined) out[kk] = vv;\n    }\n  }\n  return out;\n}\n\n/************ Pickers ************/\nfunction pickInit(){\n  return $json.init_config\n      || ($items('init_config')?.[0]?.json)\n      || ($items('normalize_for_notion')?.[0]?.json?.init_config)\n      || null;\n}\n\nfunction mergedData(){\n  const all = $input.all() || [];\n  const sources = [\n    $items('normalize_for_notion')?.[0]?.json,\n    $json,\n    ...all.map(i => i.json),\n    $items('gd_output')?.[0]?.json,\n  ].filter(Boolean);\n  const m = {};\n  for (const s of sources) flatten(s, m);\n  return m;\n}\n\nfunction pickImageUrls(r){\n  const candidates = [\n    r.gdrive_view_url,\n    r.ScreenshotUrl,\n    r.screenshot_url,\n    r.preview_url,\n    r.thumb_url,\n    r.image_url,\n    r.file_url\n  ].filter(nonEmpty);\n\n  if (nonEmpty(r.gdrive_file_id)){\n    const id = r.gdrive_file_id;\n    candidates.unshift(`https://drive.google.com/uc?export=view&id=${id}`);\n    candidates.unshift(`https://drive.google.com/thumbnail?id=${id}&sz=w2048`);\n  }\n  const uniq = [...new Set(candidates)];\n  const coverUrl = uniq.find(u => /thumbnail\\?id=|sz=w/i.test(u)) || uniq[0] || null;\n  const shotUrl  = uniq[0] || null;\n  return { coverUrl, shotUrl };\n}\n\n/* pageId finder — берём из входов */\nfunction pickPageId(){\n  if ($json?.id && $json?.url) return $json.id;\n  try { const a = $input.all().find(i=>i.json?.id && i.json?.url); if(a) return a.json.id; } catch {}\n  try { return $items(\"Check for Many\")?.[0]?.json?.id; } catch {}\n  return null;\n}\n\n/************ Inputs ************/\nconst init = pickInit() || {};\nconst data = mergedData();\nconst { coverUrl, shotUrl } = pickImageUrls(data);\nconst pageId = pickPageId();\n\nif (!pageId) {\n  return [{ json: { _error: \"NO_PAGE_ID\", _hint: \"Upstream must pass Notion page id (e.g., from search/merge node)\" } }];\n}\n\n// Get structure from simplified init_config\nconst dbStructure = init.DB_STRUCTURE || {};\nconst validFields = dbStructure.validFields || [];\nconst fieldTypes = dbStructure.fieldTypes || {};\nconst readOnlyFields = dbStructure.readOnlyFields || ['UID', 'Captured at'];\n\n/************ Build properties ************/\nconst P = {};\nconst fromConfig = new Set();\n\n// 1) Only process fields that exist in the database schema\nfor (const [fieldName, value] of Object.entries(data)) {\n  // Skip if field doesn't exist in DB schema\n  if (!validFields.includes(fieldName)) {\n    console.warn(`Skipping non-existent field: ${fieldName}`);\n    continue;\n  }\n  \n  // Skip read-only fields for updates\n  if (readOnlyFields.includes(fieldName)) {\n    continue;\n  }\n  \n  fromConfig.add(fieldName);\n  \n  const fieldType = fieldTypes[fieldName] || inferType(fieldName, value);\n  \n  // Skip empty values except for specific types\n  if (!nonEmpty(value) && !['files','date','checkbox'].includes(fieldType)) continue;\n  \n  switch (fieldType) {\n    case 'title':\n      P[fieldName] = { title: [{ text: { content: toStr(value) } }] };\n      break;\n    case 'select':\n      P[fieldName] = { select: nonEmpty(value) ? { name: toStr(value) } : null };\n      break;\n    case 'multi_select':\n      P[fieldName] = { multi_select: toMulti(value).map(v => ({ name: v })) };\n      break;\n    case 'number': {\n      const n = toNum(value);\n      if (n !== undefined) P[fieldName] = { number: n };\n      break;\n    }\n    case 'date': {\n      if (value && typeof value === 'object' && ('start' in value || 'end' in value)) {\n        const s = toISODate(value.start); const e = toISODate(value.end);\n        if (s || e) P[fieldName] = { date: { start: s || e, end: e || null } };\n      } else {\n        const s = toISODate(value);\n        if (s) P[fieldName] = { date: { start: s } };\n      }\n      break;\n    }\n    case 'url':\n      if (nonEmpty(value)) P[fieldName] = { url: toStr(value) };\n      break;\n    case 'email':\n      if (nonEmpty(value)) P[fieldName] = { email: toStr(value) };\n      break;\n    case 'phone_number':\n      if (nonEmpty(value)) P[fieldName] = { phone_number: toStr(value) };\n      break;\n    case 'files': {\n      const url = (fieldName === 'Screenshot') ? (shotUrl || toStr(value)) : (toStr(value) || shotUrl);\n      if (nonEmpty(url)) P[fieldName] = { files: [{ name: data.ScreenShotFile || 'file', external: { url } }] };\n      break;\n    }\n    case 'checkbox':\n      P[fieldName] = { checkbox: !!value };\n      break;\n    default:\n      if (nonEmpty(value)) P[fieldName] = { rich_text: [{ text: { content: toStr(value) } }] };\n  }\n}\n\n/************ Return ************/\nconst body = {\n  properties: P,\n  // cover добавляем только если есть НОВЫЙ url\n  ...(nonEmpty(coverUrl) ? { cover: { external: { url: coverUrl } } } : {})\n};\n\nreturn [{\n  json: {\n    method: \"PATCH\",\n    url: `https://api.notion.com/v1/pages/${pageId}`,\n    body\n  }\n}];"
       },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
       "position": [
         1120,
         -48
@@ -80,7 +88,7 @@
       "name": "build_update_payload"
     },
     {
-      "parameters": {
+        "parameters": {
         "jsCode": "/**\n * build_dynamic_prompt (Simplified)\n * Uses the simplified init_config structure\n */\n\nconst cfg = $items('init_config')?.[0]?.json || {};\n\n// Build prompt from simplified structure\nconst typeOptions = cfg.TYPE_OPTIONS?.Type?.select?.options?.map(o => o.name).join(', ') || 'Product,Contact,Event,Note';\nconst typePrompt = cfg.TYPE_OPTIONS?.Type?.prompt || 'Classify the screenshot.';\n\nconst fieldPrompts = Object.entries(cfg.FIELDS || {})\n  .map(([name, prompt]) => `- ${name}: ${prompt}`)\n  .join('\\n');\n\nconst perTypeGuides = Object.entries(cfg.PER_TYPE || {})\n  .map(([type, fields]) => {\n    const fieldLines = Object.entries(fields)\n      .map(([k, v]) => `    - ${k}: ${v.prompt}`)\n      .join('\\n');\n    return `  ${type}:\\n${fieldLines}`;\n  })\n  .join('\\n');\n\nconst baseSchema = Object.entries(cfg.OUTPUT_SCHEMA?.base || {})\n  .map(([k, v]) => `  \"${k}\": \"${v}\"`)\n  .join(',\\n');\n\nconst prompt_text = `\nYou are a screenshot cataloging assistant. Return STRICT valid JSON and nothing else.\n\nType classification (one of: ${typeOptions}):\n${typePrompt}\n\nFields (what to put into each):\n${fieldPrompts}\n\nAdditional fields by type:\n${perTypeGuides}\n\nSchema:\n{\n${baseSchema}\n}\n\nRequirements:\n- If some data is missing, use null and decrease confidence.\n- Output MUST be pure JSON only. No explanations, no extra text.\n\nLANGUAGE POLICY (strict):\n- ${cfg.POLICY?.language || 'Output language = dominant OCR language; never translate.'}\n- ${cfg.POLICY?.missing || 'If a value is not on the screenshot, set it to null and decrease confidence.'}\n- ${cfg.POLICY?.scriptsGuard || 'Do not output ko/ja/zh unless those scripts appear in the screenshot.'}\n`.trim();\n\nreturn [{ json: { prompt_text } }];"
       },
       "type": "n8n-nodes-base.code",
@@ -91,82 +99,82 @@
       ],
       "id": "2eb9beab-737c-4b9e-b742-d35483cdd581",
       "name": "build_dynamic_prompt"
-    }
-  ],
-  "connections": {
+      }
+    ],
+    "connections": {
     "Start": {
-      "main": [
-        [
-          {
+        "main": [
+          [
+            {
             "node": "init_config",
-            "type": "main",
-            "index": 0
-          }
+              "type": "main",
+              "index": 0
+            }
+          ]
         ]
-      ]
-    },
+      },
     "extract_file_id": {
-      "main": [
-        [
-          {
+        "main": [
+          [
+            {
             "node": "build_dynamic_prompt",
-            "type": "main",
-            "index": 0
-          }
+              "type": "main",
+              "index": 0
+            }
+          ]
         ]
-      ]
-    },
+      },
     "init_config": {
-      "main": [
-        [
-          {
+        "main": [
+          [
+            {
             "node": "extract_file_id",
-            "type": "main",
-            "index": 0
-          }
+              "type": "main",
+              "index": 0
+            }
+          ]
         ]
-      ]
-    },
+      },
     "build_create_payload": {
-      "main": [
-        [
-          {
+        "main": [
+          [
+            {
             "node": "build_update_payload",
-            "type": "main",
-            "index": 0
-          }
+              "type": "main",
+              "index": 0
+            }
+          ]
         ]
-      ]
-    },
+      },
     "build_update_payload": {
-      "main": [
-        [
-          {
+        "main": [
+          [
+            {
             "node": "build_create_payload",
-            "type": "main",
-            "index": 0
-          }
+              "type": "main",
+              "index": 0
+            }
+          ]
         ]
-      ]
-    },
+      },
     "build_dynamic_prompt": {
-      "main": [
-        [
-          {
+        "main": [
+          [
+            {
             "node": "build_create_payload",
-            "type": "main",
-            "index": 0
-          }
+              "type": "main",
+              "index": 0
+            }
+          ]
         ]
-      ]
-    }
-  },
-  "settings": {
-    "executionOrder": "v1"
-  },
-  "meta": {
-    "templateCredsSetupCompleted": true
-  },
+      }
+    },
+    "settings": {
+      "executionOrder": "v1"
+    },
+    "meta": {
+      "templateCredsSetupCompleted": true
+    },
   "tags": [
     {
       "id": "buzWDBiL7XyI4bpf",

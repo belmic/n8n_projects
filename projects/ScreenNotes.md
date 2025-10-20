@@ -1,30 +1,30 @@
-# ScreenNotes v.4.0
+# ScreenNotes v.4.2
 
 ## Overview
 Advanced document management workflow for ScreenNotes with AI-powered analysis, duplicate detection, and comprehensive data processing. This workflow provides intelligent document processing, automatic categorization, and AI-driven insights for screen notes and documentation.
 
 ## Project Details
-- **ID**: proj_screennotes_v40
-- **Created**: 2025-01-27T10:00:00.000Z
-- **Updated**: 2025-01-27T10:00:00.000Z
-- **Status**: draft
+- **ID**: proj_screennotes_v42
+- **Created**: 2025-10-19T21:17:40.616Z
+- **Updated**: 2025-10-19T21:23:32.309Z
+- **Status**: Active
 - **Author**: Mykhailo Bielov
-- **Version**: 4.0.0
+- **Version**: 4.2.0
 
 ## Workflow Information
-- **Nodes**: 11
-- **Connections**: 10
-- **Active**: No
-- **Trigger Type**: Webhook Trigger
-- **Execution Frequency**: On-demand (webhook-triggered)
-- **Data Source**: Webhook POST requests
+- **Nodes**: 40
+- **Connections**: 37
+- **Active**: Yes
+- **Trigger Type**: Telegram Trigger
+- **Execution Frequency**: On-demand (telegram-triggered)
+- **Data Source**: Telegram messages with media
 - **Data Destination**: Notion database
-- **AI Integration**: OpenAI GPT-3.5-turbo
+- **AI Integration**: OpenAI GPT-4o-mini
 - **Complexity**: Advanced
 
 ## Workflow Architecture
 
-The ScreenNotes v.4.0 workflow follows a sophisticated multi-stage processing pipeline with simplified configuration:
+The ScreenNotes v.4.2 workflow follows a sophisticated multi-stage processing pipeline with simplified configuration:
 
 ### 1. **Configuration Management**
 - **Simplified init_config**: Single source of truth for all field definitions
@@ -363,7 +363,17 @@ To add a new field:
 
 ## Version History
 
-### v.4.0 (Current)
+### v.4.2 (Current)
+- **Date**: 2025-10-19
+- **Changes**: 
+  - Clean, stable version without enrichment features
+  - Fixed validation errors and configuration issues
+  - Improved workflow reliability
+  - Streamlined architecture with 40 nodes
+  - Enhanced Telegram integration
+  - Better Notion database operations
+
+### v.4.0 (Previous)
 - **Simplified Configuration**: Single init_config node manages all settings
 - **Dynamic Field Management**: Easy addition of new fields
 - **Enhanced AI Integration**: GPT-4 Vision for image analysis
