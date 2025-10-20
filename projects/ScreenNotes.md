@@ -26,75 +26,33 @@ Advanced document management workflow for ScreenNotes with AI-powered analysis, 
 
 ## Workflow Architecture
 
-The ScreenNotes v.4.5 workflow follows a sophisticated multi-stage processing pipeline with comprehensive configuration management:
+The ScreenNotes v.4.5 workflow follows a sophisticated multi-stage processing pipeline with comprehensive configuration management and advanced AI integration:
 
-### Core Processing Stages
+### Processing Flow Overview
 
-#### 1. **Initialization & Configuration** (4 nodes)
-- **Start** (Telegram Trigger): Receives messages with media from Telegram
-- **init_config**: Comprehensive configuration management with field definitions, database structure, and AI prompts
-- **code_search_db**: Builds Notion database search queries
-- **notion_search_db**: Searches for existing Notion databases
+The workflow operates through several interconnected stages, each handling specific aspects of document processing:
 
-#### 2. **Database Management** (6 nodes)
-- **pick_db_by_name**: Selects appropriate Notion database with strict matching rules
-- **compose_db_route_ctx**: Builds database context and routing logic
-- **Switch**: Routes workflow based on /start command and database existence
-- **build_db_create payload**: Creates new database payload when needed
-- **notion_create_db**: Creates new Notion database
-- **build_post_create_msg**: Generates confirmation messages
-
-#### 3. **File Processing** (6 nodes)
-- **extract_file_id**: Extracts file information from Telegram messages with priority handling
-- **getFile**: Retrieves file metadata from Telegram API
-- **build_tgURL**: Constructs Telegram file URLs
-- **downloadFile**: Downloads files from Telegram servers
-- **Crypto**: Generates SHA256 hash for file identification
-- **Sticky Notes**: Visual organization and documentation
-
-#### 4. **AI Analysis** (3 nodes)
-- **build_dynamic_prompt**: Generates dynamic prompts based on configuration
-- **analyze_image**: OpenAI GPT-4o-mini image analysis with structured output
-- **parse_JSON**: Robust JSON extraction from AI responses
-
-#### 5. **Data Enrichment** (3 nodes)
-- **enrichment_router**: Routes data for Contact/Event enrichment
-- **serpapi_search1**: SerpAPI integration for location/event data
-- **url_generator**: Generates map URLs and event links
-
-#### 6. **Google Drive Integration** (3 nodes)
-- **gd_input**: Prepares data for GDrive sub-workflow
-- **call_gdrive_flow**: Executes GDrive upload workflow
-- **gd_output**: Processes GDrive results and merges data
-
-#### 7. **Data Normalization** (1 node)
-- **normalize_for_notion**: Comprehensive data normalization with type inference and field mapping
-
-#### 8. **Notion Operations** (4 nodes)
-- **check_for_many**: Checks for existing entries in Notion database
-- **if_entry_exist**: Conditional logic for create vs update operations
-- **build_create_payload**: Dynamic payload creation for new Notion pages
-- **build_update_payload**: Dynamic payload creation for existing page updates
-- **notion_create**: Executes Notion API operations
-
-#### 9. **Response Generation** (2 nodes)
-- **build_tg_message**: Generates Telegram response messages
-- **msg_response**: Sends confirmation messages to Telegram
-
-#### 10. **Error Handling** (2 nodes)
-- **build_error_text**: Generates error messages
-- **msg_error**: Sends error notifications
+1. **Initialization & Database Setup**: Configures the workflow and ensures Notion database exists
+2. **File Processing**: Downloads and processes media files from Telegram
+3. **AI Analysis**: Analyzes screenshots using OpenAI GPT-4o-mini with structured output
+4. **Data Enrichment**: Enhances data with external APIs (SerpAPI for locations/events)
+5. **Google Drive Integration**: Uploads files to organized Google Drive folders
+6. **Data Normalization**: Prepares data for Notion database with type inference
+7. **Database Operations**: Creates or updates Notion pages with intelligent duplicate detection
+8. **Response Generation**: Provides user feedback through Telegram messages
+9. **Error Handling**: Manages errors and provides appropriate user notifications
 
 ### Key Features
 
 - **Dynamic Field Management**: Supports 40+ configurable fields with type-specific processing
-- **Multi-Type Support**: Handles Product, Contact, Event, and Note classifications
-- **Intelligent Routing**: Smart workflow routing based on command and database state
-- **Data Enrichment**: Automatic map URL generation and event link discovery
+- **Multi-Type Support**: Handles Product, Contact, Event, and Note classifications with specialized fields
+- **Intelligent Routing**: Smart workflow routing based on /start command and database existence
+- **Data Enrichment**: Automatic map URL generation and event link discovery via SerpAPI
 - **Robust Error Handling**: Comprehensive error management and user feedback
-- **File Processing**: Multi-format support with priority-based file selection
-- **AI Integration**: Advanced image analysis with structured data extraction
+- **File Processing**: Multi-format support with priority-based file selection (photo > document > video > animation > sticker)
+- **AI Integration**: Advanced image analysis with structured data extraction using GPT-4o-mini
 - **Database Management**: Automatic database creation and field validation
+- **Sub-workflow Integration**: Seamless Google Drive upload via dedicated sub-workflow
 
 ### 1. **Configuration Management**
 - **Simplified init_config**: Single source of truth for all field definitions
@@ -126,125 +84,332 @@ The ScreenNotes v.4.5 workflow follows a sophisticated multi-stage processing pi
 - **Telegram Response**: Sends confirmation messages to users
 - **Status Updates**: Provides real-time feedback on processing
 
-### Node Details
+### Detailed Node Descriptions
 
-#### 1. init_config (Code Node)
-- **Type**: n8n-nodes-base.code
-- **Purpose**: Single source of truth for workflow configuration
-- **Key Features**:
-  - Simplified field definitions in FIELDS array
-  - Auto-generates Notion DB properties
-  - Dynamic prompt generation for AI
-  - Field validation and type mapping
-- **Configuration**: Contains all workflow settings, database schema, and AI prompts
-
-#### 2. Telegram Trigger
+#### 1. Start (Telegram Trigger)
 - **Type**: n8n-nodes-base.telegramTrigger
-- **Purpose**: Receives messages with media attachments
+- **Purpose**: Entry point for the workflow, receives messages with media attachments
 - **Configuration**: 
   - Updates: message
   - Download: false
-- **Expected Input**: Telegram messages with photos, documents, or videos
+- **Expected Input**: Telegram messages with photos, documents, videos, animations, or stickers
+- **Pin Data**: Contains sample Telegram message with photo data for testing
 
-#### 3. extract_file_id (Code Node)
+#### 2. init_config (Code Node)
 - **Type**: n8n-nodes-base.code
-- **Purpose**: Extracts file metadata from Telegram updates
-- **Output**: 
-  - chat_id, file_id, caption, file_name
-  - content_kind, has_media, token
+- **Purpose**: Single source of truth for workflow configuration
+- **Key Features**:
+  - Simplified field definitions in FIELDS array (40+ fields)
+  - Auto-generates Notion DB properties and schema
+  - Dynamic prompt generation for AI analysis
+  - Field validation and type mapping
+  - Workflow settings (Telegram, Notion, GDrive, SerpAPI)
+  - Type-specific field groups (Product, Contact, Event, Note)
+- **Configuration**: Contains all workflow settings, database schema, AI prompts, and field definitions
 
-#### 4. getFile (HTTP Request)
+#### 3. Database Management Nodes
+
+##### code_search_db (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Builds Notion database search queries
+- **Features**: Dynamic query construction with filters and pagination
+
+##### notion_search_db (HTTP Request)
 - **Type**: n8n-nodes-base.httpRequest
-- **Purpose**: Gets file path from Telegram API
-- **URL**: `https://api.telegram.org/bot{token}/getFile`
+- **Purpose**: Searches for existing Notion databases
+- **URL**: `https://api.notion.com/v1/search`
+- **Method**: POST
+- **Headers**: Notion-Version, Authorization
 
-#### 5. build_tgURL (Code Node)
+##### pick_db_by_name (Code Node)
 - **Type**: n8n-nodes-base.code
-- **Purpose**: Builds direct file URL from Telegram file path
+- **Purpose**: Selects appropriate Notion database with strict matching rules
+- **Features**: 
+  - Exact name matching with fallback to contains matching
+  - Parent page validation
+  - Database existence checking
+- **Output**: found_db_id, found_db_url, db_exists, resolved_as
+
+##### compose_db_route_ctx (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Builds database context and routing logic
+- **Features**: 
+  - /start command detection
+  - Database existence checking
+  - Route index calculation for Switch node
+- **Output**: database_id, database_url, db_exists, route context
+
+##### Switch (Switch Node)
+- **Type**: n8n-nodes-base.switch
+- **Purpose**: Routes workflow based on /start command and database existence
+- **Routes**:
+  - START_HAS_DB: /start command with existing database
+  - NO_START_NO_DB: No /start command, no database
+  - START_NO_DB: /start command, no database (create new)
+  - NO_START_HAS_DB: No /start command, existing database (process)
+
+##### build_db_create payload (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Creates new database payload when needed
+- **Features**: 
+  - Parent page ID validation
+  - Database name validation
+  - Property schema validation
+- **Output**: body, meta (notionVersion, name, parentPageId)
+
+##### notion_create_db (HTTP Request)
+- **Type**: n8n-nodes-base.httpRequest
+- **Purpose**: Creates new Notion database
+- **URL**: `https://api.notion.com/v1/databases`
+- **Method**: POST
+- **Headers**: Notion-Version, Authorization, Content-Type
+
+##### build_post_create_msg (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Generates confirmation messages after database creation
+- **Features**: 
+  - Database details formatting
+  - Inline keyboard with Notion link
+  - Success confirmation message
+
+#### 4. File Processing Nodes
+
+##### extract_file_id (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Extracts file information from Telegram messages with priority handling
+- **Features**:
+  - Priority-based file selection (largest photo → document → video → animation → sticker)
+  - Chat ID extraction from various message types
+  - File name generation with timestamps
+  - Token retrieval from init_config
+- **Output**: chat_id, file_id, caption, file_name, content_kind, has_media, token
+
+##### getFile (HTTP Request)
+- **Type**: n8n-nodes-base.httpRequest
+- **Purpose**: Retrieves file metadata from Telegram API
+- **URL**: `https://api.telegram.org/bot{token}/getFile`
+- **Method**: POST
+- **Body**: file_id parameter
+
+##### build_tgURL (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Constructs Telegram file URLs
+- **Features**:
+  - Direct file URL generation
+  - File name and extension extraction
+  - Error handling for missing paths/tokens
 - **Output**: tg_file_url, screenshot_url, file_name, file_ext
 
-#### 6. downloadFile (HTTP Request)
+##### downloadFile (HTTP Request)
 - **Type**: n8n-nodes-base.httpRequest
-- **Purpose**: Downloads file from Telegram servers
+- **Purpose**: Downloads files from Telegram servers
+- **URL**: `https://api.telegram.org/file/bot{token}/{file_path}`
 - **Response Format**: File
+- **Output Property**: screenshot
 
-#### 7. Crypto (Crypto Node)
+##### Crypto (Crypto Node)
 - **Type**: n8n-nodes-base.crypto
 - **Purpose**: Generates SHA256 hash for file identification
+- **Algorithm**: SHA256
+- **Input**: Binary data from downloaded file
 - **Output**: ImageUID (unique identifier)
 
-#### 8. build_dynamic_prompt (Code Node)
+#### 5. AI Analysis Nodes
+
+##### build_dynamic_prompt (Code Node)
 - **Type**: n8n-nodes-base.code
-- **Purpose**: Builds AI prompts from simplified init_config
+- **Purpose**: Generates dynamic prompts based on configuration
 - **Features**:
-  - Dynamic field prompts
-  - Type-specific guidance
+  - Dynamic field prompts from init_config
+  - Type-specific guidance for Product, Contact, Event, Note
   - Language policy enforcement
+  - Output schema validation
+- **Output**: prompt_text (structured AI prompt)
 
-#### 9. analyze_image (OpenAI)
+##### analyze_image (OpenAI)
 - **Type**: @n8n/n8n-nodes-langchain.openAi
-- **Purpose**: Analyzes screenshots using GPT-4 Vision
+- **Purpose**: Analyzes screenshots using GPT-4o-mini with structured output
 - **Model**: gpt-4o-mini
-- **Input**: Dynamic prompt + image URL
+- **Features**:
+  - Vision capabilities for image analysis
+  - Structured JSON output requirement
+  - Max tokens: 600
+  - Detail: auto
+- **Input**: Dynamic prompt + image URL from build_tgURL
 
-#### 10. parse_JSON (Code Node)
+##### parse_JSON (Code Node)
 - **Type**: n8n-nodes-base.code
 - **Purpose**: Robustly extracts JSON from AI responses
-- **Features**: Handles malformed JSON, missing brackets, trailing commas
+- **Features**: 
+  - Handles malformed JSON, missing brackets, trailing commas
+  - Content extraction from various OpenAI response formats
+  - JSON sanitization and validation
+  - Error reporting with raw content
+- **Output**: Parsed JSON object or error details
 
-#### 11. normalize_for_notion (Code Node)
+#### 6. Data Enrichment Nodes
+
+##### enrichment_router (Code Node)
 - **Type**: n8n-nodes-base.code
-- **Purpose**: Normalizes AI output for Notion database
+- **Purpose**: Routes data for Contact/Event enrichment
 - **Features**:
-  - Field mapping using DB_STRUCTURE
-  - Type conversion and validation
-  - UID generation and screenshot URL resolution
+  - Type-based enrichment (Contact/Event only)
+  - SerpAPI configuration generation
+  - Search query construction
+  - Enrichment need assessment
+- **Output**: enrichment_needed, enrichment_query, enrichment_type, enrichment_config
 
-#### 12. Google Drive Integration
-- **Sub-workflow**: GDrive_upload
-- **Purpose**: Uploads files to Google Drive
-- **Features**: Automatic folder organization by type
+##### serpapi_search1 (HTTP Request)
+- **Type**: n8n-nodes-base.httpRequest
+- **Purpose**: SerpAPI integration for location/event data
+- **URL**: `https://serpapi.com/search`
+- **Features**:
+  - Google search with local results
+  - Configurable parameters (country, language, num results)
+  - Timeout handling (15 seconds)
+- **Parameters**: api_key, q, engine, country, language, num, safe, tbm
 
-#### 13. check_for_many (Notion)
+##### url_generator (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Generates map URLs and event links
+- **Features**:
+  - GPS coordinate extraction from SerpAPI results
+  - Google Maps URL generation
+  - Best match selection algorithm
+  - Match score calculation
+- **Output**: Enhanced data with map URLs and confidence scores
+
+#### 7. Google Drive Integration Nodes
+
+##### gd_input (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Prepares data for GDrive sub-workflow
+- **Features**:
+  - Parent folder ID extraction
+  - Folder name generation from Type field
+  - File URL preparation
+  - File name validation and extension handling
+- **Output**: parentId, folderName, fileUrl, fileName
+
+##### call_gdrive_flow (Execute Workflow)
+- **Type**: n8n-nodes-base.executeWorkflow
+- **Purpose**: Executes GDrive upload workflow
+- **Sub-workflow**: GDrive_upload (Yxs70uuQ2IMHaXP9)
+- **Features**:
+  - Wait for sub-workflow completion
+  - Input parameter mapping
+  - Error handling
+
+##### gd_output (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Processes GDrive results and merges data
+- **Features**:
+  - File ID extraction from sub-workflow
+  - Google Drive URL generation
+  - Data merging with original normalized data
+  - Error handling for failed uploads
+- **Output**: Enhanced data with GDrive URLs and file IDs
+
+#### 8. Data Normalization Node
+
+##### normalize_for_notion (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Comprehensive data normalization with type inference and field mapping
+- **Features**:
+  - Multi-source data merging (AI, GDrive, Telegram, SerpAPI)
+  - Type inference for Notion field types
+  - UID generation from Crypto node or fallback hash
+  - Screenshot URL resolution (Telegram → GDrive → fallback)
+  - Field validation using DB_STRUCTURE
+  - Auto-generated fields (Captured at, Channel, UID)
+- **Output**: Normalized data ready for Notion database
+
+#### 9. Notion Operations Nodes
+
+##### check_for_many (Notion)
 - **Type**: n8n-nodes-base.notion
-- **Purpose**: Checks for existing entries using UID
+- **Purpose**: Checks for existing entries in Notion database using UID
 - **Operation**: getAll with UID filter
-
-#### 14. if_entry_exist (IF Node)
-- **Type**: n8n-nodes-base.if
-- **Purpose**: Determines create vs update path
-- **Logic**: If entries found → update, else create
-
-#### 15. build_create_payload (Code Node)
-- **Type**: n8n-nodes-base.code
-- **Purpose**: Builds Notion create page payload
 - **Features**:
-  - Uses simplified init_config structure
-  - Field validation using validFields
-  - Auto-generated fields handling
+  - Duplicate detection using unique identifier
+  - Always output data (even if no results)
+  - Database ID from normalized data
 
-#### 16. build_update_payload (Code Node)
+##### if_entry_exist (IF Node)
+- **Type**: n8n-nodes-base.if
+- **Purpose**: Conditional logic for create vs update operations
+- **Logic**: If entries found → update path, else create path
+- **Condition**: Checks count of results from check_for_many
+
+##### build_create_payload (Code Node)
 - **Type**: n8n-nodes-base.code
-- **Purpose**: Builds Notion update page payload
+- **Purpose**: Dynamic payload creation for new Notion pages
+- **Features**:
+  - Field validation using validFields from DB_STRUCTURE
+  - Type-specific property formatting
+  - Auto-generated fields handling
+  - Required fields enforcement
+  - Cover image handling
+- **Output**: POST request payload for Notion API
+
+##### build_update_payload (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Dynamic payload creation for existing page updates
 - **Features**:
   - Read-only field protection
   - Conditional field updates
-  - Image URL handling
+  - Page ID extraction from upstream
+  - Cover image updates
+- **Output**: PATCH request payload for Notion API
 
-#### 17. notion_create (HTTP Request)
+##### notion_create (HTTP Request)
 - **Type**: n8n-nodes-base.httpRequest
-- **Purpose**: Creates/updates Notion pages
-- **Method**: POST/PATCH
-- **URL**: Notion API endpoints
+- **Purpose**: Executes Notion API operations (create/update)
+- **Method**: Dynamic (POST/PATCH from payload)
+- **URL**: Dynamic (from payload)
+- **Headers**: Notion-Version, Authorization, Content-Type
+- **Body**: Dynamic JSON from create/update payload
 
-#### 18. build_tg_message (Code Node)
+#### 10. Response Generation Nodes
+
+##### build_tg_message (Code Node)
 - **Type**: n8n-nodes-base.code
-- **Purpose**: Builds Telegram response messages
-- **Features**: Markdown formatting, action indicators, Notion links
+- **Purpose**: Generates Telegram response messages
+- **Features**:
+  - Markdown formatting with escape handling
+  - Action indicators (✏️ Updated, 🆕 Created)
+  - Notion page links
+  - Tag formatting
+  - Date range display
+- **Output**: text, chat_id, notion_url, notion_page_id, action, tags, type, title
 
-#### 19. msg_response (Telegram)
+##### msg_response (Telegram)
 - **Type**: n8n-nodes-base.telegram
 - **Purpose**: Sends confirmation messages to users
+- **Features**:
+  - HTML parsing mode
+  - Chat ID from message context
+- **Input**: Formatted message from build_tg_message
+
+#### 11. Error Handling Nodes
+
+##### build_error_text (Code Node)
+- **Type**: n8n-nodes-base.code
+- **Purpose**: Generates error messages
+- **Features**:
+  - Context-aware error messages
+  - Database connection status reporting
+  - /start command guidance
+  - HTML formatting
+- **Output**: chat_id, text, parse_mode, disable_web_page_preview
+
+##### msg_error (Telegram)
+- **Type**: n8n-nodes-base.telegram
+- **Purpose**: Sends error notifications
+- **Features**:
+  - HTML parsing mode
+  - Web page preview disabled
+- **Input**: Error message from build_error_text
 
 ## Database Schema
 
