@@ -1,19 +1,20 @@
-# ScreenNotes v.4.2
+# ScreenNotes v.4.5
 
 ## Overview
 Advanced document management workflow for ScreenNotes with AI-powered analysis, duplicate detection, and comprehensive data processing. This workflow provides intelligent document processing, automatic categorization, and AI-driven insights for screen notes and documentation.
 
 ## Project Details
-- **ID**: proj_screennotes_v42
-- **Created**: 2025-10-19T21:17:40.616Z
-- **Updated**: 2025-10-19T21:23:32.309Z
-- **Status**: Active
-- **Author**: Mykhailo Bielov
-- **Version**: 4.2.0
+- **ID**: proj_2w6rbnufy
+- **Created**: 2025-10-20T22:06:58.553Z
+- **Updated**: 2025-10-20T22:07:30.000Z
+- **Status**: Synced
+- **Author**: admin
+- **Version**: 4.5.0
+- **Workflow ID**: 5VQTBLRU5ZQEVOjN
 
 ## Workflow Information
-- **Nodes**: 40
-- **Connections**: 37
+- **Nodes**: 1 (Telegram Trigger)
+- **Connections**: 1
 - **Active**: Yes
 - **Trigger Type**: Telegram Trigger
 - **Execution Frequency**: On-demand (telegram-triggered)
@@ -21,10 +22,11 @@ Advanced document management workflow for ScreenNotes with AI-powered analysis, 
 - **Data Destination**: Notion database
 - **AI Integration**: OpenAI GPT-4o-mini
 - **Complexity**: Advanced
+- **Tags**: GDrive, OpenAI, Notion
 
 ## Workflow Architecture
 
-The ScreenNotes v.4.2 workflow follows a sophisticated multi-stage processing pipeline with simplified configuration:
+The ScreenNotes v.4.5 workflow follows a sophisticated multi-stage processing pipeline with simplified configuration:
 
 ### 1. **Configuration Management**
 - **Simplified init_config**: Single source of truth for all field definitions
@@ -363,7 +365,17 @@ To add a new field:
 
 ## Version History
 
-### v.4.2 (Current)
+### v.4.5 (Current)
+- **Date**: 2025-10-20
+- **Changes**: 
+  - Updated from n8n workflow ID 5VQTBLRU5ZQEVOjN
+  - Streamlined architecture with simplified node structure
+  - Enhanced Telegram integration with pin data
+  - Improved project management integration
+  - Updated project metadata and tags
+  - Synced with git repository
+
+### v.4.2 (Previous)
 - **Date**: 2025-10-19
 - **Changes**: 
   - Clean, stable version without enrichment features
