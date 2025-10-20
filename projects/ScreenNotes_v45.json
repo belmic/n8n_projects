@@ -36,6 +36,77 @@
             "name": "ScreenNotes"
           }
         }
+      },
+      {
+        "parameters": {
+          "jsCode": "/**\n * extract_file_id (uses ONLY $items('start'))\n * - Reads Telegram update strictly from $items('start')[0].json\n * - Priority: largest photo → document → video → animation → sticker\n * - Returns: { chat_id, file_id, caption, file_name, content_kind, has_media, token }\n */\n\nfunction largestPhoto(photos) {\n  if (!Array.isArray(photos) || photos.length === 0) return null;\n  const sorted = [...photos].sort((a, b) => (a.file_size || 0) - (b.file_size || 0));\n  return sorted.at(-1) || null;\n}\n\nfunction firstText(...vals) {\n  for (const v of vals) if (typeof v === 'string' && v.trim()) return v;\n  return '';\n}\n\n// 1) Strictly use the Start node payload\nconst startItem = $items('Start')?.[0]?.json || {};\n\n// 2) Pick the effective Telegram message object from Start\n//    (covers common Telegram update shapes)\nconst m =\n  startItem.message ||\n  startItem.edited_message ||\n  startItem.channel_post ||\n  startItem.edited_channel_post ||\n  (startItem.callback_query ? startItem.callback_query.message : null) ||\n  {};\n\n// 3) Extract chat_id\nconst chat_id =\n  (m.chat && typeof m.chat.id !== 'undefined') ? m.chat.id :\n  (startItem.callback_query && startItem.callback_query.from && typeof startItem.callback_query.from.id !== 'undefined')\n    ? startItem.callback_query.from.id\n    : null;\n\n// 4) Extract media file_id by priority\nlet file_id = null;\nlet content_kind = null;\n\nconst ph = largestPhoto(m.photo);\nif (ph?.file_id) {\n  file_id = ph.file_id;\n  content_kind = 'photo';\n} else if (m.document?.file_id) {\n  file_id = m.document.file_id;\n  content_kind = 'document';\n} else if (m.video?.file_id) {\n  file_id = m.video.file_id;\n  content_kind = 'video';\n} else if (m.animation?.file_id) {\n  file_id = m.animation.file_id;\n  content_kind = 'animation';\n} else if (m.sticker?.file_id) {\n  file_id = m.sticker.file_id;\n  content_kind = 'sticker';\n}\n\n// 5) Caption/text and a reasonable file name\nconst caption = firstText(m.caption, m.text);\nconst file_name =\n  m?.document?.file_name ||\n  m?.video?.file_name ||\n  (content_kind === 'photo' ? `photo_${Date.now()}.jpg` : `file_${Date.now()}`);\n\n// 6) Read token ONLY from init_config\nconst token = $items('init_config')?.[0]?.json?.TELEGRAM_BOT_TOKEN || null;\n\n// 7) Output\nreturn [{\n  json: {\n    chat_id,\n    file_id,\n    caption,\n    file_name,\n    content_kind,\n    has_media: !!file_id,\n    token\n  }\n}];\n"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          48,
+          608
+        ],
+        "id": "9838846c-ace0-402a-b50c-4a8cf45c0087",
+        "name": "extract_file_id"
+      },
+      {
+        "parameters": {
+          "url": "=https://api.telegram.org/bot{{ $json.token }}/getFile",
+          "sendBody": true,
+          "bodyParameters": {
+            "parameters": [
+              {
+                "name": "=file_id",
+                "value": "={{ $json.file_id }}"
+              }
+            ]
+          },
+          "options": {}
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          256,
+          608
+        ],
+        "id": "32b4598c-e68d-4df7-95e0-8f2abb664578",
+        "name": "getFile"
+      },
+      {
+        "parameters": {
+          "url": "=https://api.telegram.org/file/bot8349012441:AAF0_PdT0ltnkii1uX9_L9mm0-o20dZuMuo/{{$json.result.file_path}}",
+          "options": {
+            "response": {
+              "response": {
+                "responseFormat": "file",
+                "outputPropertyName": "screenshot"
+              }
+            }
+          }
+        },
+        "type": "n8n-nodes-base.httpRequest",
+        "typeVersion": 4.2,
+        "position": [
+          672,
+          608
+        ],
+        "id": "cfc13334-0ff3-480f-9bb6-008a94157b42",
+        "name": "downloadFile"
+      },
+      {
+        "parameters": {
+          "jsCode": "/**\n * normalize_for_notion (v3.8)\n * - Без хардкода: берёт init_config + всё из апстрима (LLM/сервисные ноды), сливает и нормализует.\n * - Поддержка UID из ноды Crypto/crypto (ImageUID/UID/hash/sha256/sha1/md5) → потом UID/file_unique_id → fallback-хэш.\n * - Резолвит screenshot_url (tg/gdrive/llm), прокидывает rootFolderId, ScreenShotFile.\n * - Прокидывает вниз NOTION_DATABASE_ID (из pick_db_by_name → found_db_id), а также database_id/db_id алиасы.\n * - Возвращает плоский JSON + init_config.\n */\n\n/************ Small utils ************/\nconst nonEmpty = v => (v!==null && v!==undefined && (typeof v!=='string' || v.trim()!=='') && (!Array.isArray(v) || v.length>0));\nconst isObj = v => v && typeof v === 'object' && !Array.isArray(v);\nconst toStr = v => (v==null ? '' : String(v));\nfunction safe(getter, dflt){ try { const v = getter(); return v === undefined ? dflt : v; } catch { return dflt; } }\nfunction hashStr(s){ s = String(s || ''); let h = 5381; for (let i=0;i<s.length;i++) h = ((h<<5)+h)+s.charCodeAt(i); return (h>>>0).toString(16); }\n\nfunction toNumber(v){\n  if (v == null || v === '') return undefined;\n  if (typeof v === 'number' && isFinite(v)) return v;\n  const s = String(v).trim().replace(/\\s+/g, '').replace(',', '.');\n  const n = Number(s);\n  return isFinite(n) ? n : undefined;\n}\nfunction upper(v){ if (!nonEmpty(v) && v !== 0) return undefined; return String(v).trim().toUpperCase(); }\n\n/************ Dates ************/\nfunction toIsoDate(v){\n  if (!v) return undefined;\n  if (typeof v === 'string'){\n    const s = v.trim();\n    if (/^\\d{4}-\\d{2}-\\d{2}/.test(s)) return s.slice(0,10);\n    const dm = s.match(/^(\\d{2})\\.(\\d{2})\\.(\\d{4})$/);\n    if (dm) return `${dm[3]}-${dm[2]}-${dm[1]}`;\n    const d = new Date(s);\n    if (!isNaN(+d)) return d.toISOString().slice(0,10);\n    return undefined;\n  }\n  if (v instanceof Date && !isNaN(+v)) return v.toISOString().slice(0,10);\n  return undefined;\n}\nfunction buildNotionDate(input){\n  if (!input) return undefined;\n  if (typeof input === 'string' || input instanceof Date){\n    const start = toIsoDate(input);\n    return start ? { start, end: null } : undefined;\n  }\n  const start = toIsoDate(input.start);\n  const end = toIsoDate(input.end);\n  if (!start && !end) return undefined;\n  return { start: start || undefined, end: end || null };\n}\n\n/************ Lists / bool ************/\nfunction toMulti(val){\n  if (val == null) return undefined;\n  if (Array.isArray(val)) return val.filter(nonEmpty).map(v=>String(v).trim());\n  const s = String(val);\n  if (s.includes(',')) return s.split(',').map(x=>x.trim()).filter(nonEmpty);\n  const one = s.trim();\n  return one ? [one] : undefined;\n}\nfunction boolish(v){\n  if (typeof v === 'boolean') return v;\n  const s = String(v).trim().toLowerCase();\n  if (['true','yes','1','y','on'].includes(s)) return true;\n  if (['false','no','0','n','off'].includes(s)) return false;\n  return !!v;\n}\n\n/************ Flatten + merge ************/\nfunction flatten(obj, out = {}) {\n  if (!isObj(obj)) return out;\n  for (const [k, v] of Object.entries(obj)) {\n    out[k] = v;\n    if (isObj(v) && ['data','payload','record','result','results','properties','output'].includes(k)) {\n      for (const [kk, vv] of Object.entries(v)) if (out[kk] === undefined) out[kk] = vv;\n    }\n  }\n  return out;\n}\nfunction mergedData(){\n  const all = $input.all() || [];\n  const sources = [\n    ...all.map(i => i.json),\n    $json,\n    safe(()=> $items('gd_output')[0].json, null),\n    safe(()=> $items('build_tgURL')[0].json, null),\n    safe(()=> $items('getFile')[0].json, null),\n  ].filter(Boolean);\n  const m = {};\n  for (const s of sources) flatten(s, m);\n  return m;\n}\n\n/************ Init config ************/\nfunction pickInit(){\n  return safe(()=> $items('init_config')[0].json, null)\n      || safe(()=> $json.init_config, null)\n      || null;\n}\nconst cfg = pickInit() || {};\nconst fieldsCfgArray = Array.isArray(cfg.fields) ? cfg.fields : []; // если массив\nconst ndbProps = isObj(cfg.NOTION_DB_PROPERTIES) ? cfg.NOTION_DB_PROPERTIES : null; // если объект схемы\nconst allowedTypes = safe(()=> (cfg.typeOptions?.Type?.select?.options || []).map(o => o.name), []);\nconst SCREEN_ROOT_ID = cfg.routes?.screenRootId || '1TD-SOF7vE5EnYwhwils2GFIFT5mQwlAP';\n\n/************ DB ID resolver (pick_db_by_name first) ************/\nfunction pickDbIdFromFlow(){\n  const byName = safe(()=> $items('pick_db_by_name')[0].json, null);\n  if (byName?.found_db_id) return byName.found_db_id;\n  if ($json?.NOTION_DATABASE_ID) return $json.NOTION_DATABASE_ID;\n  if ($json?.database_id)       return $json.database_id;\n  if ($json?.db_id)             return $json.db_id;\n  if (cfg?.database_id)         return cfg.database_id;\n  const all = $input.all() || [];\n  for (const it of all){\n    const j = it.json || {};\n    if (j.found_db_id) return j.found_db_id;\n    if (j.database_id) return j.database_id;\n    if (j.db_id)       return j.db_id;\n  }\n  return null;\n}\n\n/************ Screenshot candidates (LLM/TG/GDrive) ************/\nconst file_name =\n  safe(()=> $node['build_tgURL'].json.file_name, null) ||\n  safe(()=> $items('build_tgURL')[0].json.file_name, null) ||\n  safe(()=> $json.file_name, 'file');\n\nconst token =\n  safe(()=> $node['extract_file_id'].json.token, null) ||\n  safe(()=> $items('extract_file_id')[0].json.token, null);\n\nfunction pickScreenshotURL(data){\n  const cand = [\n    data.screenshot_url,\n    data.ScreenshotUrl,\n    data.preview_url,\n    data.image_url,\n    data.file_url,\n    data.thumb_url,\n    data.gdrive_view_url,\n  ].filter(nonEmpty);\n\n  const tg_direct =\n    safe(()=> $items('build_tgURL')[0].json.tg_file_url, null) ||\n    (token && safe(()=> $items('getFile')[0].json.result.file_path, null)\n      ? `https://api.telegram.org/file/bot${token}/${$items('getFile')[0].json.result.file_path}`\n      : null) ||\n    (token && data.file_path ? `https://api.telegram.org/file/bot${token}/${data.file_path}` : null);\n\n  if (tg_direct) cand.unshift(tg_direct);\n\n  if (nonEmpty(data.gdrive_file_id)){\n    const id = data.gdrive_file_id;\n    cand.unshift(`https://drive.google.com/uc?export=view&id=${id}`);\n    cand.unshift(`https://drive.google.com/thumbnail?id=${id}&sz=w2048`);\n  }\n\n  const uniq = [...new Set(cand)];\n  return uniq[0] || undefined;\n}\n\n/************ UID resolver (Crypto node / data / fallback) ************/\nfunction pickUID(data){\n  const cryptoJ =\n    safe(()=> $items('Crypto')[0].json, null) ||\n    safe(()=> $items('crypto')[0].json, null) ||\n    safe(()=> $node['Crypto'].json, null)     ||\n    safe(()=> $node['crypto'].json, null);\n\n  const fromCrypto =\n    cryptoJ?.ImageUID || cryptoJ?.imageUID ||\n    cryptoJ?.UID      || cryptoJ?.uid      ||\n    cryptoJ?.hash     || cryptoJ?.sha256   ||\n    cryptoJ?.sha1     || cryptoJ?.md5      || null;\n\n  const fromData =\n    data.UID || data.uid ||\n    data.imageUID || data.image_uid ||\n    data.file_unique_id || data.file_id || null;\n\n  if (fromCrypto) return String(fromCrypto);\n  if (fromData)   return String(fromData);\n\n  const raw = [\n    data['Source URL'] || data.source_url || '',\n    data.screenshot_url || data.ScreenshotUrl || '',\n    data.file_name || data.ScreenShotFile || '',\n    data.file_size || '',\n    data.Title || data.title || ''\n  ].join('|');\n  return hashStr(raw);\n}\n\n/************ Type inference ************/\nfunction inferType(name, value){\n  const s = String(name||'').toLowerCase();\n  if (s.includes('url') || /^https?:\\/\\//i.test(value||'')) return 'url';\n  if (s.endsWith('_email') || s === 'email') return 'email';\n  if (s.endsWith('_phone') || s === 'phone') return 'phone_number';\n  if (s.includes('date') || s.endsWith('_at') || s.endsWith('date')) return 'date';\n  if (s.includes('price') || s.includes('amount') || typeof value === 'number') return 'number';\n  if (s.includes('tags') || s.includes('labels') || Array.isArray(value)) return 'multi_select';\n  if (s.includes('currency') || s.includes('status') || s.endsWith('type') || s.includes('category') || s.includes('lang') || s.includes('channel')) return 'select';\n  if (s.includes('screenshot') || s.endsWith('_file') || s.endsWith('_image')) return 'files';\n  if (s.includes('checkbox') || typeof value === 'boolean') return 'checkbox';\n  if (s === 'title' || s === 'name') return 'title';\n  return 'rich_text';\n}\nfunction normalizeByType(t, val){\n  switch (t) {\n    case 'number': return toNumber(val);\n    case 'date':\n      if (val && typeof val === 'object' && ('start' in val || 'end' in val)) return buildNotionDate(val);\n      return buildNotionDate(val) || undefined;\n    case 'select': return nonEmpty(val) ? toStr(val) : undefined;\n    case 'multi_select': return toMulti(val);\n    case 'url': return nonEmpty(val) ? toStr(val) : undefined;\n    case 'email': return nonEmpty(val) ? toStr(val) : undefined;\n    case 'phone_number': return nonEmpty(val) ? toStr(val) : undefined;\n    case 'checkbox': return !!boolish(val);\n    case 'files': return nonEmpty(val) ? toStr(val) : undefined; // URL string\n    case 'title': return nonEmpty(val) ? toStr(val) : undefined;\n    default: return nonEmpty(val) ? toStr(val) : undefined;\n  }\n}\n\n/************ Build normalized payload ************/\nconst data = mergedData();\nconst out = {};\nconst usedKeys = new Set();\n\n// 0) Если init_config содержит объект схемы NOTION_DB_PROPERTIES — построим локальную карту типов (по желанию)\nconst cfgMap = {};\nif (ndbProps){\n  for (const [k, schema] of Object.entries(ndbProps)){\n    if (!isObj(schema)) continue;\n    const [t] = Object.keys(schema); // title / select / number / date / ...\n    if (t) cfgMap[k] = t;\n  }\n}\n\n// 1) Сначала — поля из init_config.fields (если это массив имён/описаний полей)\nfor (const f of (fieldsCfgArray || [])){\n  const name = f?.name || f?.notion || f?.src;\n  if (!name) continue;\n  const src  = f?.src || name;\n  const raw  = (data[src] !== undefined) ? data[src] : data[name];\n  const type = f?.type || cfgMap[name] || inferType(name, raw);\n\n  let v = raw;\n  if ((!nonEmpty(v)) && type === 'files' && /screenshot/i.test(name)) v = pickScreenshotURL(data);\n\n  const norm = normalizeByType(type, v);\n  if (norm !== undefined){ out[name] = norm; usedKeys.add(src); usedKeys.add(name); }\n}\n\n// 2) Если из пункта (1) ничего не пришло — ориентируемся на ndbProps (объект схемы)\nif (Object.keys(out).length === 0 && Object.keys(cfgMap).length){\n  for (const [name, type] of Object.entries(cfgMap)){\n    const raw = (data[name] !== undefined) ? data[name] : data[name];\n    let v = raw;\n    if ((!nonEmpty(v)) && type === 'files' && /screenshot/i.test(name)) v = pickScreenshotURL(data);\n    const norm = normalizeByType(type, v);\n    if (norm !== undefined){ out[name] = norm; usedKeys.add(name); }\n  }\n}\n\n// 3) Title (если не задан)\nif (out.Title == null){\n  const titleCand = data.Title ?? data.title ?? data.Name ?? data.name ?? data.caption ?? 'Untitled';\n  out.Title = toStr(titleCand);\n  usedKeys.add('Title'); usedKeys.add('title'); usedKeys.add('Name'); usedKeys.add('name');\n}\n\n// 4) Type (ограничиваем списком из init_config, если он есть)\nif (allowedTypes?.length){\n  const proposed = data.Type ?? data.type ?? 'Note';\n  out.Type = allowedTypes.includes(proposed) ? proposed : 'Note';\n  usedKeys.add('Type'); usedKeys.add('type');\n} else if (data.Type || data.type){\n  out.Type = toStr(data.Type ?? data.type);\n  usedKeys.add('Type'); usedKeys.add('type');\n}\n\n// 5) UID (Crypto → data → fallback hash)\nout['UID'] = pickUID(data);\n\n// 6) Автодобавление остальных ключей (инференс)\nconst SKIP = new Set([\n  'id','object','url','cover','icon','parent','archived','created_time','last_edited_time',\n  'properties','results','result','payload','data','output','method','body','headers',\n  'database_id','db_id','found_db_id','found_db_url','found_title','requested_name',\n  'file_id','file_path','tg_file_url','token',\n  'gdrive_file_id','gdrive_view_url',\n]);\nfor (const [k,v] of Object.entries(data)){\n  if (usedKeys.has(k) || SKIP.has(k)) continue;\n  if (!nonEmpty(v)) continue;\n  if (out[k] !== undefined) continue;\n  const type = cfgMap[k] || inferType(k, v);\n  const norm = normalizeByType(type, v);\n  if (norm !== undefined) out[k] = norm;\n}\n\n// 7) Screenshot/screenshot_url (если ещё нет)\nconst bestShot = pickScreenshotURL({ ...data, ScreenshotUrl: out.Screenshot ?? data.ScreenshotUrl });\nif (bestShot && !out.Screenshot && !out.screenshot_url){\n  const hasScreenshotProp =\n    (fieldsCfgArray || []).some(f => (f?.type === 'files' && /screenshot/i.test(f?.name || f?.src || ''))) ||\n    Object.keys(cfgMap).some(k => /screenshot/i.test(k) && cfgMap[k]==='files');\n  if (hasScreenshotProp) out['Screenshot'] = bestShot;\n  else out['screenshot_url'] = bestShot;\n}\n\n// 8) Лёгкая нормализация частых полей\nif (out.Currency != null) out.Currency = upper(out.Currency);\nif (data.currency != null && out.Currency == null) out.Currency = upper(data.currency);\nif (!out['Map URL'] && (out.Address || data.address)){\n  out['Map URL'] = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(out.Address || data.address)}`;\n}\n\n// 9) Сервис для GDrive и таймштамп\nout['ScreenShotFile'] = file_name || 'file';\nout['rootFolderId']   = SCREEN_ROOT_ID;\nout['Captured at']    = new Date().toISOString();\n\n// 10) Проложим init_config вниз\nout['init_config'] = cfg;\n\n// 11) Прокинем NOTION_DATABASE_ID (из pick_db_by_name приоритетно)\nconst DB_ID = pickDbIdFromFlow();\nif (DB_ID){\n  out.NOTION_DATABASE_ID = DB_ID;\n  out.database_id        = DB_ID;\n  out.db_id              = DB_ID;\n}\n\n// Done\nreturn [{ json: out }];\n"
+        },
+        "type": "n8n-nodes-base.code",
+        "typeVersion": 2,
+        "position": [
+          48,
+          1264
+        ],
+        "id": "203099e7-b951-4126-9dff-d71d59ae4a75",
+        "name": "normalize_for_notion",
+        "executeOnce": false
       }
     ],
     "connections": {
@@ -44,6 +115,375 @@
           [
             {
               "node": "init_config",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "extract_file_id": {
+        "main": [
+          [
+            {
+              "node": "getFile",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "getFile": {
+        "main": [
+          [
+            {
+              "node": "build_tgURL",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "downloadFile": {
+        "main": [
+          [
+            {
+              "node": "Crypto",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "normalize_for_notion": {
+        "main": [
+          [
+            {
+              "node": "gd_input",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_tg_message": {
+        "main": [
+          [
+            {
+              "node": "msg_response",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_create_payload": {
+        "main": [
+          [
+            {
+              "node": "notion_create",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "notion_create": {
+        "main": [
+          [
+            {
+              "node": "build_tg_message",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_update_payload": {
+        "main": [
+          [
+            {
+              "node": "notion_create",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_tgURL": {
+        "main": [
+          [
+            {
+              "node": "downloadFile",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Crypto": {
+        "main": [
+          [
+            {
+              "node": "build_dynamic_prompt",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "call_gdrive_flow": {
+        "main": [
+          [
+            {
+              "node": "gd_output",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "gd_input": {
+        "main": [
+          [
+            {
+              "node": "call_gdrive_flow",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "gd_output": {
+        "main": [
+          [
+            {
+              "node": "check_for_many",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "init_config": {
+        "main": [
+          [
+            {
+              "node": "code_search_db",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_db_create payload": {
+        "main": [
+          [
+            {
+              "node": "notion_create_db",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "pick_db_by_name": {
+        "main": [
+          [
+            {
+              "node": "compose_db_route_ctx",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "Switch": {
+        "main": [
+          [
+            {
+              "node": "build_error_text",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "build_error_text",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "build_db_create payload",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "extract_file_id",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_error_text": {
+        "main": [
+          [
+            {
+              "node": "msg_error",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "notion_create_db": {
+        "main": [
+          [
+            {
+              "node": "build_post_create_msg",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_post_create_msg": {
+        "main": [
+          [
+            {
+              "node": "msg_base_created",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "analyze_image": {
+        "main": [
+          [
+            {
+              "node": "parse_JSON",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "parse_JSON": {
+        "main": [
+          [
+            {
+              "node": "enrichment_router",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "check_for_many": {
+        "main": [
+          [
+            {
+              "node": "if_entry_exist",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "code_search_db": {
+        "main": [
+          [
+            {
+              "node": "notion_search_db",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "notion_search_db": {
+        "main": [
+          [
+            {
+              "node": "pick_db_by_name",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "if_entry_exist": {
+        "main": [
+          [
+            {
+              "node": "build_update_payload",
+              "type": "main",
+              "index": 0
+            }
+          ],
+          [
+            {
+              "node": "build_create_payload",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "compose_db_route_ctx": {
+        "main": [
+          [
+            {
+              "node": "Switch",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "build_dynamic_prompt": {
+        "main": [
+          [
+            {
+              "node": "analyze_image",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "enrichment_router": {
+        "main": [
+          [
+            {
+              "node": "serpapi_search1",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "url_generator": {
+        "main": [
+          [
+            {
+              "node": "normalize_for_notion",
+              "type": "main",
+              "index": 0
+            }
+          ]
+        ]
+      },
+      "serpapi_search1": {
+        "main": [
+          [
+            {
+              "node": "url_generator",
               "type": "main",
               "index": 0
             }
@@ -112,7 +552,7 @@
             }
           }
         ]
-      }
+      ]
     },
     "versionId": "5244b4b9-6f9f-4829-b7df-6aa0d1ff87d0",
     "triggerCount": 1,
@@ -199,8 +639,8 @@
     "author": "admin",
     "description": "n8n workflow: ScreenNotes v.4.5 - Telegram bot for screenshot processing with Notion integration",
     "tags": ["GDrive", "OpenAI", "Notion"],
-    "nodeCount": 1,
-    "connectionCount": 1,
+    "nodeCount": 40,
+    "connectionCount": 37,
     "github": {
       "repository": null,
       "branch": "main",

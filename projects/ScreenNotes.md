@@ -13,8 +13,8 @@ Advanced document management workflow for ScreenNotes with AI-powered analysis, 
 - **Workflow ID**: 5VQTBLRU5ZQEVOjN
 
 ## Workflow Information
-- **Nodes**: 1 (Telegram Trigger)
-- **Connections**: 1
+- **Nodes**: 40 (Complete workflow with all processing stages)
+- **Connections**: 37
 - **Active**: Yes
 - **Trigger Type**: Telegram Trigger
 - **Execution Frequency**: On-demand (telegram-triggered)
@@ -26,7 +26,75 @@ Advanced document management workflow for ScreenNotes with AI-powered analysis, 
 
 ## Workflow Architecture
 
-The ScreenNotes v.4.5 workflow follows a sophisticated multi-stage processing pipeline with simplified configuration:
+The ScreenNotes v.4.5 workflow follows a sophisticated multi-stage processing pipeline with comprehensive configuration management:
+
+### Core Processing Stages
+
+#### 1. **Initialization & Configuration** (4 nodes)
+- **Start** (Telegram Trigger): Receives messages with media from Telegram
+- **init_config**: Comprehensive configuration management with field definitions, database structure, and AI prompts
+- **code_search_db**: Builds Notion database search queries
+- **notion_search_db**: Searches for existing Notion databases
+
+#### 2. **Database Management** (6 nodes)
+- **pick_db_by_name**: Selects appropriate Notion database with strict matching rules
+- **compose_db_route_ctx**: Builds database context and routing logic
+- **Switch**: Routes workflow based on /start command and database existence
+- **build_db_create payload**: Creates new database payload when needed
+- **notion_create_db**: Creates new Notion database
+- **build_post_create_msg**: Generates confirmation messages
+
+#### 3. **File Processing** (6 nodes)
+- **extract_file_id**: Extracts file information from Telegram messages with priority handling
+- **getFile**: Retrieves file metadata from Telegram API
+- **build_tgURL**: Constructs Telegram file URLs
+- **downloadFile**: Downloads files from Telegram servers
+- **Crypto**: Generates SHA256 hash for file identification
+- **Sticky Notes**: Visual organization and documentation
+
+#### 4. **AI Analysis** (3 nodes)
+- **build_dynamic_prompt**: Generates dynamic prompts based on configuration
+- **analyze_image**: OpenAI GPT-4o-mini image analysis with structured output
+- **parse_JSON**: Robust JSON extraction from AI responses
+
+#### 5. **Data Enrichment** (3 nodes)
+- **enrichment_router**: Routes data for Contact/Event enrichment
+- **serpapi_search1**: SerpAPI integration for location/event data
+- **url_generator**: Generates map URLs and event links
+
+#### 6. **Google Drive Integration** (3 nodes)
+- **gd_input**: Prepares data for GDrive sub-workflow
+- **call_gdrive_flow**: Executes GDrive upload workflow
+- **gd_output**: Processes GDrive results and merges data
+
+#### 7. **Data Normalization** (1 node)
+- **normalize_for_notion**: Comprehensive data normalization with type inference and field mapping
+
+#### 8. **Notion Operations** (4 nodes)
+- **check_for_many**: Checks for existing entries in Notion database
+- **if_entry_exist**: Conditional logic for create vs update operations
+- **build_create_payload**: Dynamic payload creation for new Notion pages
+- **build_update_payload**: Dynamic payload creation for existing page updates
+- **notion_create**: Executes Notion API operations
+
+#### 9. **Response Generation** (2 nodes)
+- **build_tg_message**: Generates Telegram response messages
+- **msg_response**: Sends confirmation messages to Telegram
+
+#### 10. **Error Handling** (2 nodes)
+- **build_error_text**: Generates error messages
+- **msg_error**: Sends error notifications
+
+### Key Features
+
+- **Dynamic Field Management**: Supports 40+ configurable fields with type-specific processing
+- **Multi-Type Support**: Handles Product, Contact, Event, and Note classifications
+- **Intelligent Routing**: Smart workflow routing based on command and database state
+- **Data Enrichment**: Automatic map URL generation and event link discovery
+- **Robust Error Handling**: Comprehensive error management and user feedback
+- **File Processing**: Multi-format support with priority-based file selection
+- **AI Integration**: Advanced image analysis with structured data extraction
+- **Database Management**: Automatic database creation and field validation
 
 ### 1. **Configuration Management**
 - **Simplified init_config**: Single source of truth for all field definitions
@@ -367,10 +435,16 @@ To add a new field:
 
 ### v.4.5 (Current)
 - **Date**: 2025-10-20
-- **Changes**: 
+- **Changes**:
   - Updated from n8n workflow ID 5VQTBLRU5ZQEVOjN
-  - Streamlined architecture with simplified node structure
-  - Enhanced Telegram integration with pin data
+  - Complete 40-node workflow with comprehensive processing pipeline
+  - Enhanced Telegram integration with pin data and multi-format support
+  - Advanced AI analysis with OpenAI GPT-4o-mini integration
+  - Comprehensive data enrichment with SerpAPI integration
+  - Dynamic field management with 40+ configurable fields
+  - Intelligent routing and error handling
+  - Google Drive integration with sub-workflow execution
+  - Robust Notion database management with auto-creation
   - Improved project management integration
   - Updated project metadata and tags
   - Synced with git repository
